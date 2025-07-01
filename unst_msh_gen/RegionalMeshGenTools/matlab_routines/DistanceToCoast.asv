@@ -1,0 +1,32 @@
+function D=DistanceToCoast(lon,lat,xx,yy)
+%function D=DistanceToCoast(lon,lat,xx,yy)
+%for pointset xx yy and coordinates of lon and lat for regular oriented
+%grid, compute
+% inputs:
+%   lon -   [nx,1] lon coordinates for output matrix
+%   lat -   [ny,1] lon coordinates for output matrix
+%   xx  - [nn,1] longitude coordiantes of point set
+%   yy  - [nn,1] latitude coordiantes of point set
+%
+% outputs:
+%   D   - [ny, nx] Distance from
+clear d0
+lat2m=single(110574.)
+lon=single(lon);
+lat=single(lat);
+clear ld1 ld2 d0;
+xx=[xus,xusHR];
+yy=[yus,yusHR];
+t0=now;
+for j=1:ny % this loop takes ~16 hours
+    j/ny
+    lon2m=single(111320.*cos(lat(j)*pi/180));
+    DLON= mod(lon(:)'-xx(:),360) ;% large matrix
+    ld1=min (  abs(  [ DLON ]*lon2m + i*[ones(1,nx)*lat(j) - yy(:)]*lat2m  ) );
+    ld2=min (  abs(  [360 - DLON ]*lon2m + i*[ones(1,nx)*lat(j) - yy(:)]*lat2m  ) ); 360-ld1;
+    d0(j,:)=min(  [ ld1(:),ld2(:) ]'  );
+    t1=now;
+    est=(ny-j)*[(t1-t0)/j];
+    disp(['etimated time remaing: ' ,num2str(est*24),' hrs'])
+end
+D=d0;

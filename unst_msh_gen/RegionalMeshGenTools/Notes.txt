@@ -1,0 +1,27 @@
+
+Global mesh generattion
+
+to generate global mesh_1kmUSCL_15kmOOFltOcnLLH.msh
+
+1) GenateGlobalWUScoast15kmHR.m
+    in:  fl='RTopo_2_0_4_GEBCO_v2023_60sec_pixel.nc'
+    in: S = shaperead('us_coastline/tl_2023_us_coastline.shp');
+    in:topoJS = loadmsh('/home/keston/jigsaw/jigsaw-geo-matlab/files/topo.msh'); 
+
+    out: dist_D_HR.mat distance to US coast
+    out: hfun.mat
+    
+    
+    savemsh('mesh_1kmUSCL_15kmOO',mesh) ;% Spherical form
+
+    meshP=GlobalMesh2Planer(mesh,topo);
+    savemsh('mesh_1kmUSCL_15kmOO_planar',meshP) ; 
+    load GlobalCoastline1kmUSto15km.mat %land boiundary
+    meshO = CutOutLand(meshP,S,3)
+    savemsh('mesh_1kmUSCL_15kmOO_planar_ocean',meshO) ;
+
+  
+    [meshP,meshPP]=GlobalMesh2Planer(mesh,topo)
+
+
+g=loadmsh('mesh_1kmUSCL_15kmOOFltOcnLLH.msh');

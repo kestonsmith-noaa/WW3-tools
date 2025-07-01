@@ -1,0 +1,42 @@
+function lengthscale=ComputeLengthScaleX(x,y,e)
+%function ComputeLengthScale(x,y,e)
+% Input:
+% x -lon [nn x 1]
+% y -lat [nn x 1]
+% e -element list[ ne x 3]
+% 
+% Output:
+% lengthscale [ne x 1] lengthscale of element in m based on 
+
+R=6378100. %radius of earth in m
+
+[ne,three]=size(e)
+EqTrC=4*R*R/sqrt(3);
+RtTrC=2*R*R;
+lengthscale=zeros(1,ne);
+%parfor k=1:ne
+wgs84 = wgs84Ellipsoid("km");
+n=length(x);
+x(n+1)=NaN;
+y(n+1)=NaN;
+[ne,three]=size(e)
+eP=[e(:,1:3),nan+ones(ne,1)];
+X=x(eP);
+Y=y(ep);
+t0=now
+a = areaint(X,Y,wgs84)/1000;
+t1==now;
+            et=60*24*(ne-k)*(t1-t0)/k;
+            disp([' estimated time remaining : ',num2str(et),' min']);
+
+    for k=1:ne
+        if mod(k,10000)==0,
+            t1=now;
+            et=60*24*(ne-k)*(t1-t0)/k;
+            disp(['percent done : ',num2str(100*k/ne),', estimated time remaining : ',num2str(et),' min']);
+            end
+
+            %lengthscale(k)=sqrt(2*areaint(y(e(k,:)),x(e(k,:)))*R*R);
+        lengthscale(k)=sqrt(EqTrC * areaint( y(e(k,:)) , x(e(k,:)) ) );
+    end
+
