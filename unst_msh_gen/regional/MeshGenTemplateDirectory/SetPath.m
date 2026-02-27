@@ -30,3 +30,6 @@ gcflOSM='../Data/openstreetmap_land/land-polygons-complete-4326/land_polygons.sh
 gcfl=gcflOSM
 PSLGfile='NWcoastal.PSLG.msh'
 
+% for RWPS mesh with modified New Orleans coastline set:
+%PSLGfile='RWPS.GSHHSxOSM.NewOrleans.PSLG.msh'
+
