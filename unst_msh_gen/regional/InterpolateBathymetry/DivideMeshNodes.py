@@ -74,10 +74,7 @@ def WriteInterpJobscript(fl,N, ComputeNodes):
         f.write(" \n")
 
         f.write("module purge \n")
-        f.write("module use /scratch3/NCEPDEV/climate/Keston.Smith/global-workflowA/sorc/ufs_model.fd/modulefiles \n")
-        f.write("module load ufs_ursa.intel \n")
-        f.write("module load py-scipy/1.14.1 \n")
-        f.write("module load py-netcdf4/1.7.1.post2 \n")
+        f.write("source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate \n")
         f.write("pip list \n")
         f.write("srun python3  InterpolateCRM.partscat.py $SLURM_ARRAY_TASK_ID > InterpJob.$SLURM_ARRAY_TASK_ID.out \n")
         f.write("wait \n")
