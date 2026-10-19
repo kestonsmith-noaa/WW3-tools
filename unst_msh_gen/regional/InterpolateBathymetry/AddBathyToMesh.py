@@ -14,8 +14,14 @@ import FiniteElementMeshRoutines as FE
 import numpy as np
 import sys
 
-mshnm="HawaiiTest"
-mesh="meshes/"+mshnm+".msh"
+print("Defining meshname and other variables from file DefineVariables.py")
+with open("DefineVariables.py", "r") as file:
+    code = file.read()
+    print(code)
+    exec(code)
+
+meshslash=mesh.rfind('/')+1
+mshnm=mesh[meshslash:len(mesh)-3]
 
 flin=sys.argv[1]
 flout=flin+".WW3.msh"

@@ -10,8 +10,15 @@ import numpy as np
 import FiniteElementMeshRoutines as FE
 import sys
 
-mshnm="HawaiiTest"
-mesh="meshes/"+mshnm+".msh"
+print("Defining meshname and other variables from file DefineVariables.py")
+with open("DefineVariables.py", "r") as file:
+    code = file.read()
+    print(code)
+    exec(code)
+
+meshslash=mesh.rfind('/')+1
+mshnm=mesh[meshslash:len(mesh)-3]
+
 OutDir=mshnm+".files/"
 
 Nparts=int(sys.argv[1])

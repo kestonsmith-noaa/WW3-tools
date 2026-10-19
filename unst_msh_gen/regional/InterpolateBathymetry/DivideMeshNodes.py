@@ -38,8 +38,19 @@ from scipy.interpolate import RegularGridInterpolator
 import FiniteElementMeshRoutines as FE
 import random
 
-mshnm="HawaiiTest"
-mesh="meshes/"+mshnm+".msh"
+
+print("Defining meshname and other variables from file DefineVariables.py")
+with open("DefineVariables.py", "r") as file:
+    code = file.read()
+    print(code)
+    exec(code)
+print(flnms)
+fl=mesh
+#mshnm="HawaiiTest"
+#mesh="meshes/"+mshnm+".msh"
+meshslash=mesh.rfind('/')+1
+mshnm=mesh[meshslash:len(mesh)-3]
+
 OutDir=mshnm+".files/"
 
 jobcard="jobcardInterpBathy2Mesh"
@@ -94,9 +105,10 @@ except FileExistsError:
 except PermissionError:
     print(f"Permission denied: Unable to create '{OutDir}'.")
 
-fl="meshes/"+mshnm+".msh"
+#fl="meshes/"+mshnm+".msh"
+#xi, yi, ei =FE.loadWW3MeshCoords(fl)
 
-xi, yi, ei =FE.loadWW3MeshCoords(fl)
+xi, yi, ei =FE.loadWW3MeshCoords(mesh)
 
 #tmp
 lsE=FE.lengthscale(xi, yi, ei)
