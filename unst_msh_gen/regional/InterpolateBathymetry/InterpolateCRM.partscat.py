@@ -196,20 +196,20 @@ for n in range(nn):
                                         xs.append(x[kx])
                                         ys.append(y[ky])
                                         zs.append(zd)
-                                        ObsStdErr.extend(zd*0.+fileStdErr[j])
+                                        ObsStdErr.append(zd*0.+fileStdErr[j])
                                         PntCnt=PntCnt+1
                 if TextOutput:
                     print("number of points from "+fl+" is " +str( PntCnt) )
         else: # global scattered data, filetype[j] == 2
             fl=flnms[j]
-            j=np.array( np.where(  np.array(np.abs(xp-x0) < SearchWidth[j] ) & np.array(np.abs(yp-y0) < SearchWidth[j] ) ) )
-            j=list(itertools.chain.from_iterable(j))
-            j=np.array(j).flatten()
-            if j.size>0:
-                j=np.array(j).flatten()
-                x=x0[j]
-                y=y0[j]
-                zd=z0[j]
+            ju=np.array( np.where(  np.array(np.abs(xp-x0) < SearchWidth[j] ) & np.array(np.abs(yp-y0) < SearchWidth[j] ) ) )
+            ju=list(itertools.chain.from_iterable(ju))
+            ju=np.array(ju).flatten()
+            if ju.size>0:
+                ju=np.array(ju).flatten()
+                x=x0[ju]
+                y=y0[ju]
+                zd=z0[ju]
                 jp=np.where( zd <= 0.)
                 x=x[jp]
                 y=y[jp]
@@ -220,6 +220,10 @@ for n in range(nn):
                 ys.extend(y)
                 zs.extend(zd)
                 ObsStdErr.extend(zd*0.+fileStdErr[j])
+               # xs.append(x)
+               # ys.append(y)
+               # zs.append(zd)
+               # ObsStdErr.extend(zd*0.+fileStdErr[j])
     if TextOutput:      
         if n % 1 == 0:
             print("interpolating to:"+str(yp)+":"+str(xp))
@@ -254,8 +258,8 @@ for n in range(nn):
         ys=ysp
         zs=zsp
         ObsStdErr=ObsStdErrp
-##### Specify priori error statistics here#############################        
-    VarObs=ObsStdErr**2 #(m^2)
+##### Specify priori error statistics here############################# 
+    VarObs=np.array(ObsStdErr)**2 #(m^2)
 #Specify assumptions regarding background variance:         
     VarBG=BackGroundProcStdErr**2 #(m^2) Background error variance
 ##### Done specify priori error statistics ############################        
@@ -263,7 +267,7 @@ for n in range(nn):
 ##### Different depth estimators ######################################        
     if TextOutput: 
         print("Number of obs = " +str(len(zs))  )
-        print("std obs= " + str(np.sqrt(VarObs)) + " (m), std BG= " + str(np.sqrt(VarBG))+" (m)"  )
+        #print("std obs= " + str(np.sqrt(VarObs)) + " (m), std BG= " + str(np.sqrt(VarBG))+" (m)"  )
 
 # Inverse distance estimator    
     ziID[n]=GM.InverseDistance(xs,ys,zs,xp,yp)
