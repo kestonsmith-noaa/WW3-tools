@@ -27,10 +27,16 @@
 
 import numpy as np
 
-#covmod="Sph"
-covmod="Exp"
-CovExp=2 # Exponent in covariance funtion, used if covmod="Exp", 
-IDExp=2 # exponent used in inverse distance estimator
+print("Defining meshname and other variables from file DefineVariables.py")
+with open("DefineVariables.py", "r") as file:
+    code = file.read()
+    print(code)
+    exec(code)
+
+#covmod="Sph" # use spherical covariance
+#covmod="Exp" # use exponential covariance
+#CovExp=2 # Exponent in covariance funtion, used if covmod="Exp", 
+#IDExp=2 # exponent used in inverse distance estimator
 
 deg2km=111.132954
 deg2rad=np.pi/180

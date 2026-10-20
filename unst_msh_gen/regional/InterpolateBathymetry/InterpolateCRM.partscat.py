@@ -19,20 +19,13 @@ import time
 import numpy as np
 import netCDF4 as nc
 
-#import jigsawpy
 import sys
 from scipy.interpolate import RegularGridInterpolator
-import math
 
-#from geopy import distance
 import itertools
-#from geopy.distance import haversine
-#from pykrige.ok import OrdinaryKriging
 
 import FiniteElementMeshRoutines as FE
 import GaussMarkov as GM
-
-
 
 print("Defining meshname and other variables from file DefineVariables.py")
 with open("DefineVariables.py", "r") as file:
@@ -41,7 +34,8 @@ with open("DefineVariables.py", "r") as file:
     exec(code)
 
 meshslash=mesh.rfind('/')+1
-mshnm=mesh[meshslash:len(mesh)-3]
+mshnm=mesh[meshslash:len(mesh)-4]
+OutDir=mshnm+".files/"
 
 xlist=[]
 ylist=[]
@@ -158,7 +152,8 @@ for n in range(nn):
     yp=yil[n]
 # Set local length scale to use in Gauss Markov smoothing at node n
 #    LSp=2.*LSl[n] #probably better choice for spherical covarianve function
-    LSp=1.*LSl[n] #choice for exponential covarianve function
+#    LSp=1.*LSl[n] #choice for exponential covariance function
+    LSp=CovarianceLengthscaleFactor*LSl[n] # Error covaraince length scale porportional to mesh length sacale
     LocalLengthScale[n]=LSp 
     xs=[]
     ys=[]
@@ -170,13 +165,12 @@ for n in range(nn):
                 x=np.array(xlist[j][:])
                 y=np.array(ylist[j][:])
                 fl=flnms[j]
-                if TextOutput:
-                    print(fl)
                 jx=np.array(np.where( np.abs(xp-x) < SearchWidth[j] ))
                 jx=list(itertools.chain.from_iterable(jx))
                 jy=np.array(np.where( np.abs(yp-y) < SearchWidth[j] ))
                 jy=list(itertools.chain.from_iterable(jy))
                 data = nc.Dataset(BathyDir+fl,"r")
+                PntCnt=0
                 for kx in jx:
                     for ky in jy:
                             if kx and ky: # not empty 
@@ -187,18 +181,23 @@ for n in range(nn):
                                         d=GM.DistanceV(xs,ys,x[kx],y[ky])
                                         if np.min(d)<Dmin:
                                             if TextOutput:
-                                                print("near duplicate point at distance: "+str(np.min(d))+" for node "+str(n))
+                                                print("near duplicate point at distance: "+str(np.min(d))+"(km) for node "+str(n))
                                             IncludePoint=False #END -check for near duplicate points
                                     zd=float(z.data)
-                                    if zd < Zmin:#double check mask fail and bad fill value
-                                            IncludePoint=False
-    #                                if zd > Zmax:#exclude land values(should be optional)
-    #                                        IncludePoint=False
+                                    if zd < Zmin: # double check mask fail and bad fill value
+                                        IncludePoint=False
+                                    if ExcludeLand:
+                                        if zd > Zmax: # exclude land values(should be optional)
+                                             IncludePoint=False
                                     if IncludePoint: # first point
-                                        zd=min(zd,Zmax) # trunkate interpolant to Zmax<=0
+                                        if ZeroOutLandVals:
+                                             zd=min(zd,Zmax) # trunkate interpolant to Zmax<=0
                                         xs.append(x[kx])
                                         ys.append(y[ky])
                                         zs.append(zd)
+                                        PntCnt=PntCnt+1
+                if TextOutput:
+                    print("number of points from "+fl+" is " +str( PntCnt) )
         else: # global scattered data, filetype[j] == 2
             fl=flnms[j]
             j=np.array( np.where(  np.array(np.abs(xp-x0) < SearchWidth[j] ) & np.array(np.abs(yp-y0) < SearchWidth[j] ) ) )
@@ -307,5 +306,4 @@ np.savetxt(floutClosest,  ziClosest, fmt='%.6f', delimiter='\n')
 np.savetxt(floutNpts, NumPoints, fmt='%i', delimiter='\n')
 #Mesh length scale approcimation at nodes
 np.savetxt(floutLLS, LocalLengthScale, fmt='%.6f', delimiter='\n')
-    
-    
+

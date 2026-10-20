@@ -49,7 +49,7 @@ fl=mesh
 #mshnm="HawaiiTest"
 #mesh="meshes/"+mshnm+".msh"
 meshslash=mesh.rfind('/')+1
-mshnm=mesh[meshslash:len(mesh)-3]
+mshnm=mesh[meshslash:len(mesh)-4]
 
 OutDir=mshnm+".files/"
 
@@ -76,21 +76,21 @@ def WriteInterpJobscript(fl,N, ComputeNodes):
         f.write("module purge \n")
         f.write("source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate \n")
         f.write("pip list \n")
-        f.write("srun python3  InterpolateCRM.partscat.py $SLURM_ARRAY_TASK_ID > InterpJob.$SLURM_ARRAY_TASK_ID.out \n")
+        f.write("srun python InterpolateCRM.partscat.py $SLURM_ARRAY_TASK_ID > InterpJob.$SLURM_ARRAY_TASK_ID.out \n")
         f.write("wait \n")
         f.write("## Run this after the full job array is compleate.\n")
         f.write("## Patch randomly shuffled fields in orgigonal order.\n")
-        
-        f.write("python3 KnitOutputBackTogether.py "+str(N)+" GMN\n")
-        f.write("python3 KnitOutputBackTogether.py "+str(N)+" GMU\n")
-        f.write("python3 KnitOutputBackTogether.py "+str(N)+" InvDist\n")
-        f.write("python3 KnitOutputBackTogether.py "+str(N)+" NDataPoints\n")
-        f.write("python3 KnitOutputBackTogether.py "+str(N)+" ClosestValue\n")
-        f.write("python3 KnitOutputBackTogether.py "+str(N)+" LengthScale\n")
-        f.write("python3 KnitOutputBackTogether.py "+str(N)+" GMU.std\n")
-        f.write("python3 KnitOutputBackTogether.py "+str(N)+" GMN.std\n")
-        #f.write("python3 KnitOutputBackTogether.py "+str(N)+" GMM\n")
-        #f.write("python3 KnitOutputBackTogether.py "+str(N)+" GM0\n")
+
+        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" InvDist\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" NDataPoints\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" ClosestValue\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" LengthScale\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU.std\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN.std\n")
+        f.write("python AddBathyToMesh.py "+mshnm+".GMU.txt 1.0 \n")
+        f.write("python AddBathyToMesh.py "+mshnm+".GMN.txt 1.0 \n")
 
 
 # Create the output directory------------------------------------------
@@ -102,15 +102,11 @@ except FileExistsError:
 except PermissionError:
     print(f"Permission denied: Unable to create '{OutDir}'.")
 
-#fl="meshes/"+mshnm+".msh"
-#xi, yi, ei =FE.loadWW3MeshCoords(fl)
-
 xi, yi, ei =FE.loadWW3MeshCoords(mesh)
 
-#tmp
-lsE=FE.lengthscale(xi, yi, ei)
+lsE=FE.lengthscale(xi, yi, ei) # mesh length scale on elements
 areaE=FE.ElementArea(xi, yi, ei)
-lsN=FE.ComputeNodeLengthScale(lsE, areaE, ei)
+lsN=FE.ComputeNodeLengthScale(lsE, areaE, ei) # mesh length scale on nodes
 np.savetxt("LengthScaleNodes.txt",  lsN, fmt='%.6f', delimiter='\n')
 
 # randomly sort nodes for roughly equal jobs size

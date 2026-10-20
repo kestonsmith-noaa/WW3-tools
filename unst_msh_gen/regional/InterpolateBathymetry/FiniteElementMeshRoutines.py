@@ -23,8 +23,6 @@
 #
 
 import numpy as np
-import math
-#from geopy import distance
 import re
 
 # Simple distance approximation in kilometers for calculating element

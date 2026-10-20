@@ -20,24 +20,28 @@ with open("DefineVariables.py", "r") as file:
     print(code)
     exec(code)
 
+
 meshslash=mesh.rfind('/')+1
-mshnm=mesh[meshslash:len(mesh)-3]
+mshnm=mesh[meshslash:len(mesh)-4]
 
 flin=sys.argv[1]
 flout=flin+".WW3.msh"
+nargin = len(sys.argv) - 1
+if nargin<2:
+    MinBatDepth=float('inf')
+else:
+    MinBatDepth=float(sys.argv[2])
 
 x, y, z0, e, bnd = FE.loadWW3Mesh(mesh)
 
-zmin=1.
 nn=len(x)
 z=np.zeros(nn)
 f=open(flin, 'r')
 for k in range(nn):
     line=f.readline()
-    #print(str(k)+" "+line)
     z[k]=float(line.strip())
-    z[k]=-z[k]
-    z[k]=max(z[k],zmin)
+    z[k]=-z[k] # convert to positive is Hdown bathymetric depth
+    z[k]=max(z[k],MinBatDepth) 
 f.close
 FE.WriteWW3Mesh(flout,x,y,z,e,bnd)
 

@@ -19,7 +19,6 @@
 
 import numpy as np
 import netCDF4 as nc
-import math
 import subprocess
 
 # Example 1: Basic command execution

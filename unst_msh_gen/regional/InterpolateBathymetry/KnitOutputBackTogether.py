@@ -17,7 +17,7 @@ with open("DefineVariables.py", "r") as file:
     exec(code)
 
 meshslash=mesh.rfind('/')+1
-mshnm=mesh[meshslash:len(mesh)-3]
+mshnm=mesh[meshslash:len(mesh)-4]
 
 OutDir=mshnm+".files/"
 

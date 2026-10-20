@@ -1,5 +1,7 @@
-mesh="meshes/HawaiiTest.msh"
+mesh="meshes/rwps.oc_5km_100km.msh"
 
+########################################################
+# Begin: define data sets used in the interpolation
 BathyDir="/scratch3/NCEPDEV/climate/Keston.Smith/CoastalReliefModel/"
 ########################################################
 # processed netcdf bathymetry files with variables:
@@ -36,7 +38,6 @@ flnms=[
     "ngdc_bathy_90m_amsamoa.crm.nc",
     "RTopo_2_0_4_GEBCO_v2023_60sec_pixel.CRMformat.nc"
     ]
-
 ########################################################
 ########################################################
 # Set filetype corresponding to files in flnms 
@@ -45,17 +46,38 @@ flnms=[
 # 2 : for scattered global data
 ########################################################
 nf=len(flnms)
-filetype=np.zeros(nf, dtype=int)
-filetype[0]=2
-filetype[nf-1]=1
+filetype=np.zeros(nf, dtype=int) # local gridded bathymetry files
+filetype[0]=2 # scattered point data file: cmems_obs-sdb_glo_phy-comp_my-oa-100m-l4-s2_static.PointValues500m.nc
+filetype[nf-1]=1 # global gridded bathymetry file: RTopo_2_0_4_GEBCO_v2023_60sec_pixel.CRMformat.nc
 ########################################################
+# End: define data sets used in the interpolation
+########################################################
+
+########################################################
+# covariance model parameters
+#covmod="Sph" # use spherical covariance
+covmod="Exp" # use exponential covariance
+CovExp=2 # Exponent in covariance funtion, used if covmod="Exp", 
+IDExp=2 # exponent used in inverse distance estimator
+CovarianceLengthscaleFactor=1. # covariance Length Scale = CovarianceLengthscaleFactor * (local Mesh length scale)
+                               # Prefer set to 1. if covmod="Exp" and 2, if covmod="Sph" 
+########################################################
+
+TextOutput = True # output progress and stats durring interpolation
 
 Zmin=-11000. #deepest legit ocean depth value in case of mask fail 
 # nescesarry for data sets "crm_vol6_2023.nc.S250m.nc" and "crm_vol8_2023.nc.S250m.nc"
+
+########################################################
+#Behavior of data point inclusion relative to "land" 
 Zmax=0. # maximum value to include in interpolation - zero out land values or ignore land 
-Dmin=5./1000.# 5 meter minimum distance between observation points in km, prevent singularity
+ExcludeLand=False # if "True" data points above Zmax(==0) are not used in the interpolation 
+ZeroOutLandVals=True # if "True" data points above Zmax(==0) are set to Zmax
+########################################################
+
+Dmin=5./1000. # 5 meter minimum distance between observation points in km, prevent singularity
 lambdaLL=.025 # set deg lat, lon search width for overlapping regions
 #use Approximately NxTarget**2 points per data set, 
 #each linear system is approx 2*(NxTarget**2)
 NxTarget=20 # N=20 ~ 10 grid points in each cardinal direction used in interpolating 
-NpointsMax=1000
+NpointsMax=2400
