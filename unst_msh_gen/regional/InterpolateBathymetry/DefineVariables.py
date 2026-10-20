@@ -3,6 +3,7 @@ mesh="meshes/rwps.oc_5km_100km.msh"
 ########################################################
 # Begin: define data sets used in the interpolation
 BathyDir="/scratch3/NCEPDEV/climate/Keston.Smith/CoastalReliefModel/"
+BathyDir="/mnt/sda/keston/CoastalReliefModel/"
 ########################################################
 # processed netcdf bathymetry files with variables:
 # lon, lat and z. Specify corresponding file type, gridded or scattered,
@@ -49,6 +50,16 @@ nf=len(flnms)
 filetype=np.zeros(nf, dtype=int) # local gridded bathymetry files
 filetype[0]=2 # scattered point data file: cmems_obs-sdb_glo_phy-comp_my-oa-100m-l4-s2_static.PointValues500m.nc
 filetype[nf-1]=1 # global gridded bathymetry file: RTopo_2_0_4_GEBCO_v2023_60sec_pixel.CRMformat.nc
+########################################################
+########################################################
+# Set file observational standerd error (m) for each data file 
+########################################################
+nf=len(flnms)
+fileStdErr=np.zeros(nf)+1. # local gridded bathymetry files
+fileStdErr[0]=2. # scattered point data file: cmems_obs-sdb_glo_phy-comp_my-oa-100m-l4-s2_static.PointValues500m.nc
+fileStdErr[nf-1]=10. # global gridded bathymetry file: RTopo_2_0_4_GEBCO_v2023_60sec_pixel.CRMformat.nc
+# Set Background stdErr
+BackGroundProcStdErr=10.
 ########################################################
 # End: define data sets used in the interpolation
 ########################################################

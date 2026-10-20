@@ -54,7 +54,7 @@ def GaussMarkov(x,y,z,xi,yi,LengthScale,Vobs,V,MeanTyp,CompErr):
     for j in range(nx):
         d = DistanceV(x,y,x[j],y[j])
         C[j,range(nx)]=CovarianceDistance(d,covmod,LengthScale,V)
-        C[j,j]=C[j,j] + Vobs
+        C[j,j]=C[j,j] + Vobs[j]
     d = DistanceV(x,y,xi,yi)
     f = CovarianceDistance(d,covmod,LengthScale,V)
     detC = np.linalg.det(C)
@@ -93,7 +93,7 @@ def GaussMarkovUnkMean(x,y,z,xi,yi,LengthScale,Vobs,V,CompErr):
     for j in range(nx):
         d = DistanceV(x,y,x[j],y[j])
         C[j,range(nx)]=CovarianceDistance(d,covmod,LengthScale,V)
-        C[j,j]=C[j,j] + Vobs
+        C[j,j]=C[j,j] + Vobs[j]
         C[nx,j]=1.
         C[j,nx]=1.
     d = DistanceV(x,y,xi,yi)

@@ -158,6 +158,7 @@ for n in range(nn):
     xs=[]
     ys=[]
     zs=[]
+    ObsStdErr=[]
     si=0
     for j in range(nf):
         if filetype[j] <2 : #gridded data
@@ -195,6 +196,7 @@ for n in range(nn):
                                         xs.append(x[kx])
                                         ys.append(y[ky])
                                         zs.append(zd)
+                                        ObsStdErr.extend(zd*0.+fileStdErr[j])
                                         PntCnt=PntCnt+1
                 if TextOutput:
                     print("number of points from "+fl+" is " +str( PntCnt) )
@@ -217,6 +219,7 @@ for n in range(nn):
                 xs.extend(x)
                 ys.extend(y)
                 zs.extend(zd)
+                ObsStdErr.extend(zd*0.+fileStdErr[j])
     if TextOutput:      
         if n % 1 == 0:
             print("interpolating to:"+str(yp)+":"+str(xp))
@@ -238,27 +241,24 @@ for n in range(nn):
         xsp=np.zeros(NpointsMax)
         ysp=xsp
         zsp=xsp
+        ObsStdErrp=xsp
         D=GM.Distance(xs,ys,xp,yp)
         for k in range(NpointsMax):
             ki=np.argmin(D)
             xsp[k]=xs[ki]
             ysp[k]=ys[ki]
             zsp[k]=zs[ki]
+            ObsStdErrp[k]=ObsStdErr[ki]
             D[ki]=float('inf')
         xs=xsp
         ys=ysp
         zs=zsp
-        
+        ObsStdErr=ObsStdErrp
 ##### Specify priori error statistics here#############################        
-# Here some simple error statistics are given: These can be made dataset 
-# dependent, depth dependent, etc.
-# Assumptions regarding observation standard error:         
-    ObsErr= max(1. , np.mean(np.abs(zs))/100. ) # 1 percent of local mean depth (m)
-    VarObs=ObsErr**2 #(m^2)
+    VarObs=ObsStdErr**2 #(m^2)
 #Specify assumptions regarding background variance:         
-    VarBG=10.*VarObs #(m^2) Background variance = 10 observation error variance
+    VarBG=BackGroundProcStdErr**2 #(m^2) Background error variance
 ##### Done specify priori error statistics ############################        
-
     
 ##### Different depth estimators ######################################        
     if TextOutput: 
