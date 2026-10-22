@@ -7,7 +7,15 @@ bathymetry data files.  It was designed to use a low resolution file
 with global coverage as well as local high resolution gridded bathymetry,
 and global scattered high resolution bathymetry data, such as global
 Satellite Derived Bathymetry (SDB). Bathymetry data sets need to be 
-downloaded and preprocessed to use a common format. 
+downloaded and preprocessed to use a common format. The software is not 
+optimized for speed.
+
+The software was motivated by the development of the Regional Wave Prediction System (RWPS).
+Here some important regions require blending SDB with low resolution global database.  In regions
+where high resolution gridded bathymetry is available, this is prioritized, however data points 
+from all databases are included if they are near the point interpolated to. This is intended
+to prevent discontinuities at the boundary of data sets. 
+
 
 To interpolate bathymetry to a mesh:
     ( -1 ) set python environment to include libraries: numpy  sys os 
