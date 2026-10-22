@@ -78,6 +78,8 @@ fln=OutDir+'NodeList.'+str(N)+'.txt'
 floutID=OutDir+'InvDist.'+str(N)+'.txt'
 floutGMM=OutDir+'GMM.'+str(N)+'.txt'
 floutGMN=OutDir+'GMN.'+str(N)+'.txt'
+floutGMMmu=OutDir+'GMMmu.'+str(N)+'.txt'
+floutGMNmu=OutDir+'GMNmu.'+str(N)+'.txt'
 floutGM0=OutDir+'GM0.'+str(N)+'.txt'
 floutGMU=OutDir+'GMU.'+str(N)+'.txt'
 floutClosest=OutDir+'ClosestValue.'+str(N)+'.txt'
@@ -124,8 +126,10 @@ for fl in flnms:
 NumPoints=np.zeros(nn)
 ziID=np.zeros(nn)
 ziGMU=np.zeros(nn)
+muGMU=np.zeros(nn)
 stdiGMU=np.zeros(nn)
 ziGMN=np.zeros(nn)
+muGMN=np.zeros(nn)
 stdiGMN=np.zeros(nn)
 #ziGMM=np.zeros(nn)
 #ziGM0=np.zeros(nn)
@@ -228,7 +232,7 @@ for n in range(nn):
                 if LogDepthDependantObsErr : # observationa error increases logarithmically with obs depth
                     azd=np.abs(zd)
                     jshallow=np.where(azd<ZminDepthDependantObsErr)
-                    azd[jshallow]=<ZminDepthDependantObsErr
+                    azd[jshallow]=ZminDepthDependantObsErr
                     ObsStdErr.extend(fileStdErr[j]*np.log10(azd))
                 else :
                     ObsStdErr.extend(zd*0. + fileStdErr[j])
@@ -281,12 +285,12 @@ for n in range(nn):
     ziID[n]=GM.InverseDistance(xs,ys,zs,xp,yp)
 
 # Gauss-Markov smoothing with unkown mean (like ordinary kriging) 
-    ziGMU[n], stdiGMU[n]=GM.GaussMarkovUnkMean(xs, ys, zs, xp, yp,LSp, VarObs,VarBG,True)
+    ziGMU[n], stdiGMU[n], muGMU[n]=GM.GaussMarkovUnkMean(xs, ys, zs, xp, yp,LSp, VarObs,VarBG,True)
     if TextOutput: 
         print("GMU: est= "+str(ziGMU[n])+", err= "+str(stdiGMU[n]))
 
 # Gauss-Markov smoothing with known mean (like simple kriging). Assumed mean is closest observation 
-    ziGMN[n], stdiGMN[n]=GM.GaussMarkov(xs, ys, zs, xp, yp, LSp, VarObs,VarBG,"Nearest",True)
+    ziGMN[n], stdiGMN[n], muGMN[n]=GM.GaussMarkov(xs, ys, zs, xp, yp, LSp, VarObs,VarBG,"Nearest",True)
     if TextOutput: 
         print("GMN: est= "+str(ziGMN[n])+", err= "+str(stdiGMN[n]))
 
@@ -312,6 +316,12 @@ np.savetxt(floutGMNerr, stdiGMN, fmt='%.6f', delimiter='\n')
 np.savetxt(floutGMU,  ziGMU, fmt='%.6f', delimiter='\n')
 #Std error (m) for Gauss Markov smoothing with unknown mean output
 np.savetxt(floutGMUerr,  stdiGMU, fmt='%.6f', delimiter='\n')
+#mean for Gauss Markov smoothing with unknown mean output
+np.savetxt(floutGMUmu,  muGMU, fmt='%.6f', delimiter='\n')
+
+#mean for Gauss Markov smoothing with known mean output
+np.savetxt(floutGMNmu,  muGMN, fmt='%.6f', delimiter='\n')
+
 #Nearest neighbor estimate
 np.savetxt(floutClosest,  ziClosest, fmt='%.6f', delimiter='\n')
 #Number of bathymetry observations used for each node

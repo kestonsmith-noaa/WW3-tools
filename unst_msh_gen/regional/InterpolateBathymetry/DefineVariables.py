@@ -1,8 +1,9 @@
-mesh="meshes/rwps.oc_500m_10km.msh"
+mesh="meshes/rwps.oc_1500m_30km.msh"
 
 ########################################################
 # Begin: define data sets used in the interpolation
-BathyDir="/scratch3/NCEPDEV/climate/Keston.Smith/CoastalReliefModel/"
+#BathyDir="/scratch3/NCEPDEV/climate/Keston.Smith/CoastalReliefModel/"
+BathyDir="/mnt/sda/keston/CoastalReliefModel/"
 ########################################################
 # processed netcdf bathymetry files with variables:
 # lon, lat and z. Specify corresponding file type, gridded or scattered,
