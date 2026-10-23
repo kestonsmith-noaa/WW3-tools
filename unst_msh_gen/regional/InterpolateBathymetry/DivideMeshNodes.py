@@ -89,6 +89,8 @@ def WriteInterpJobscript(fl,N, ComputeNodes):
         f.write("python KnitOutputBackTogether.py "+str(N)+" LengthScale\n")
         f.write("python KnitOutputBackTogether.py "+str(N)+" GMU.std\n")
         f.write("python KnitOutputBackTogether.py "+str(N)+" GMN.std\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU.mu\n")
+        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN.mu\n")
         f.write("python AddBathyToMesh.py "+mshnm+".GMU.txt 1.0 \n")
         f.write("python AddBathyToMesh.py "+mshnm+".GMN.txt 1.0 \n")
 

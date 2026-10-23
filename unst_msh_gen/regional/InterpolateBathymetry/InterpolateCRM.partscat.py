@@ -76,15 +76,16 @@ N=int(sys.argv[1])
 
 fln=OutDir+'NodeList.'+str(N)+'.txt'
 floutID=OutDir+'InvDist.'+str(N)+'.txt'
-floutGMM=OutDir+'GMM.'+str(N)+'.txt'
 floutGMN=OutDir+'GMN.'+str(N)+'.txt'
-floutGM0=OutDir+'GM0.'+str(N)+'.txt'
 floutGMU=OutDir+'GMU.'+str(N)+'.txt'
 floutClosest=OutDir+'ClosestValue.'+str(N)+'.txt'
 floutNpts=OutDir+'NDataPoints.'+str(N)+'.txt'
 floutLLS=OutDir+'LengthScale.'+str(N)+'.txt'
 floutGMUerr= OutDir+'GMU.std.'+str(N)+'.txt'
 floutGMNerr= OutDir+'GMN.std.'+str(N)+'.txt'
+floutGMNmu=OutDir+'GMN.mu.'+str(N)+'.txt'
+floutGMUmu=OutDir+'GMU.mu.'+str(N)+'.txt'
+
 #read in nodes to interpolate to
 f=open(fln,"r")
 header = f.readline()
@@ -127,10 +128,10 @@ ziGMU=np.zeros(nn)
 stdiGMU=np.zeros(nn)
 ziGMN=np.zeros(nn)
 stdiGMN=np.zeros(nn)
-#ziGMM=np.zeros(nn)
-#ziGM0=np.zeros(nn)
 ziClosest=np.zeros(nn)
 LocalLengthScale=np.zeros(nn)
+muGMU=np.zeros(nn)
+muGMN=np.zeros(nn)
 
 ######################################################################
 # For each scattered data set, read in the scattered data here to
@@ -173,12 +174,14 @@ for n in range(nn):
                 jy=np.array(np.where( np.abs(yp-y) < SearchWidth[j] ))
                 jy=list(itertools.chain.from_iterable(jy))
                 data = nc.Dataset(BathyDir+fl,"r")
+                fill_value = data["z"]._FillValue
                 PntCnt=0
                 for kx in jx:
                     for ky in jy:
                             if kx and ky: # not empty 
                                 z=data["z"][ky,kx]
-                                if not z.mask:
+                                zd=float(z.data)
+                                if (not z.mask ) and (not np.isnan(zd)) and (not zd==fill_value) :
                                     IncludePoint=True
                                     if len(xs)>0: #BEGIN -check for near duplicate points - causes singularity in GMS
                                         d=GM.DistanceV(xs,ys,x[kx],y[ky])
@@ -186,7 +189,6 @@ for n in range(nn):
                                             if TextOutput:
                                                 print("near duplicate point at distance: "+str(np.min(d))+"(km) for node "+str(n))
                                             IncludePoint=False #END -check for near duplicate points
-                                    zd=float(z.data)
                                     if zd < Zmin: # double check mask fail and bad fill value
                                         IncludePoint=False
                                     if ExcludeLand:
@@ -228,7 +230,7 @@ for n in range(nn):
                 if LogDepthDependantObsErr : # observationa error increases logarithmically with obs depth
                     azd=np.abs(zd)
                     jshallow=np.where(azd<ZminDepthDependantObsErr)
-                    azd[jshallow]=<ZminDepthDependantObsErr
+                    azd[jshallow]=ZminDepthDependantObsErr
                     ObsStdErr.extend(fileStdErr[j]*np.log10(azd))
                 else :
                     ObsStdErr.extend(zd*0. + fileStdErr[j])
@@ -281,12 +283,12 @@ for n in range(nn):
     ziID[n]=GM.InverseDistance(xs,ys,zs,xp,yp)
 
 # Gauss-Markov smoothing with unkown mean (like ordinary kriging) 
-    ziGMU[n], stdiGMU[n]=GM.GaussMarkovUnkMean(xs, ys, zs, xp, yp,LSp, VarObs,VarBG,True)
+    ziGMU[n], stdiGMU[n], muGMU[n]=GM.GaussMarkovUnkMean(xs, ys, zs, xp, yp,LSp, VarObs,VarBG,True)
     if TextOutput: 
         print("GMU: est= "+str(ziGMU[n])+", err= "+str(stdiGMU[n]))
 
 # Gauss-Markov smoothing with known mean (like simple kriging). Assumed mean is closest observation 
-    ziGMN[n], stdiGMN[n]=GM.GaussMarkov(xs, ys, zs, xp, yp, LSp, VarObs,VarBG,"Nearest",True)
+    ziGMN[n], stdiGMN[n], muGMN[n]=GM.GaussMarkov(xs, ys, zs, xp, yp, LSp, VarObs,VarBG,"Nearest",True)
     if TextOutput: 
         print("GMN: est= "+str(ziGMN[n])+", err= "+str(stdiGMN[n]))
 
@@ -318,4 +320,9 @@ np.savetxt(floutClosest,  ziClosest, fmt='%.6f', delimiter='\n')
 np.savetxt(floutNpts, NumPoints, fmt='%i', delimiter='\n')
 #Mesh length scale approcimation at nodes
 np.savetxt(floutLLS, LocalLengthScale, fmt='%.6f', delimiter='\n')
+
+#mean estimate (m) for Gauss Markov smoothing with known mean output
+np.savetxt(floutGMNmu, muGMN, fmt='%.6f', delimiter='\n')
+#mean estimate (m) for Gauss Markov smoothing with unknown mean output
+np.savetxt(floutGMUmu, muGMU, fmt='%.6f', delimiter='\n')
 

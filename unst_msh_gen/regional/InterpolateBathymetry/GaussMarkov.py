@@ -84,7 +84,7 @@ def GaussMarkov(x,y,z,xi,yi,LengthScale,Vobs,V,MeanTyp,CompErr):
             return zi
         else:
             erri=np.sqrt( V  -  np.dot(f,w)) 
-            return zi, erri
+            return zi, erri, mu
 
 def GaussMarkovUnkMean(x,y,z,xi,yi,LengthScale,Vobs,V,CompErr):
     nx=len(x)
@@ -111,8 +111,11 @@ def GaussMarkovUnkMean(x,y,z,xi,yi,LengthScale,Vobs,V,CompErr):
     if not CompErr:
         return zi
     else:
-        erri=np.sqrt( V + np.dot( w[0:nx], np.matmul(C[0:nx,0:nx],w[0:nx]))  -2.* np.dot(w[0:nx],f[0:nx])   ) 
-        return zi, erri
+#        erri=np.sqrt( V + np.dot( w[0:nx], np.matmul(C[0:nx,0:nx],w[0:nx]))  -2.* np.dot(w[0:nx],f[0:nx])   ) 
+        Vpost = V - np.dot( w[0:nx] , f[0:nx] )  - w[nx]
+        erri = np.sqrt(Vpost) 
+        mu = zi - np.dot(w[0:nx],f[0:nx]) + w[nx] # posterior estimate of mean
+        return zi, erri, mu
 
 def DistanceV(x,y,x0,y0): #distance between list x,y and point x0,y0
     n=len(x)

@@ -74,7 +74,12 @@ fileStdErr[nf-1]=10. # global gridded bathymetry file: RTopo_2_0_4_GEBCO_v2023_6
 # Set Background stdErr
 BackGroundProcStdErr=50.
 
-LogDepthDependantObsErr=True
+# Introduce log(observed depth) dependent error 
+# has problems both nin theory and practice 
+# please leave LogDepthDependantObsErr=False
+# Introduced to address some artifacts due to
+# data set structures
+LogDepthDependantObsErr=False
 ZminDepthDependantObsErr=10.
 ########################################################
 # End: define data sets used in the interpolation

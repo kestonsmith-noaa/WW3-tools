@@ -61,8 +61,9 @@ for fl in flnms:
     print("smoothing with window of width "+str(m)+" or "+str(dx*float(m))+" (km)")
     print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
     
+    filval0=data0["z"]._FillValue
     z=np.asarray(data0["z"][:])
-    jfill=np.where(z==-99999)
+    jfill=np.where(z==filval0)
     z[jfill]=float('nan')
     
     nx=len(x)
@@ -83,6 +84,10 @@ for fl in flnms:
     ny=len(y)
     flout=fl[0:-3]+'.S200m.nc'
     flout=PacificIslandBatPath+"/"+flout
+    
+    jb=np.where(np.isnan(z))
+    z[jb] = filval
+
     with nc.Dataset(flout, 'w', format='NETCDF4') as ncout:
         ncout.createDimension('lon', nx)  # Unlimited dimension
         ncout.createDimension('lat', ny)
