@@ -409,11 +409,6 @@ print(weights.shape)
 
 
 
-
-
-
-
-
 import numpy as np
 import netCDF4 as nc
 import xarray as xr
@@ -537,14 +532,15 @@ print(G.shape)
 print(b.shape)
 
 #x, info = cg(C, b, tol=1e-6)
-x, info = cg(G, b)
+#x, info = cg(G, b)
+x, info = cg(G, b, x0=z,rtol=1e-8)
 print(info)
 print(x)
 
-np.savetxt("optbat.txt",x)
+np.savetxt(mshnm[0 : -3 ]+".optbat.txt",x)
 
 r=A*x-zi
-np.savetxt("residual.txt",r)
+np.savetxt(mshnm[0 : -3 ]+".residual.txt",r)
 
 diag=range(nd)
 R= sp.coo_matrix((1./ei, (diag, diag)), shape=(nd,nd)).tocsr()
@@ -571,15 +567,16 @@ b =2.* np.transpose(AR)*Rz
 print(G.shape)
 print(b.shape)
 
-x, info = cg(G, b)
+#x, info = cg(G, b)
+x, info = cg(G, b, x0=z,rtol=1e-8)
 
 print(info)
 print(x)
 
-np.savetxt("optbatObsErr.txt",x)
+np.savetxt(mshnm[0 : -3 ]+".optbatObsErr.txt",x)
 
 r=A*x-zi
-np.savetxt("residualObsErr.txt",r)
+np.savetxt(mshnm[0 : -3 ]+".residualObsErr.txt",r)
 
 r=R*(A*x-zi)
-np.savetxt("residualObsErrNormalized.txt",r)
+np.savetxt(mshnm[0 : -3 ]+".residualObsErrNormalized.txt",r)
