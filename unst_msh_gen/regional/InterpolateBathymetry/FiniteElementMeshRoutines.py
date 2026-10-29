@@ -199,8 +199,12 @@ def ElementArea(x, y, e):
         D3=Distance(x1,y1,x2,y2)
         D1=Distance(x2,y2,x3,y3)
         D2=Distance(x3,y3,x1,y1)
-        S=(D1+D2+D3)/2
-        A=np.sqrt(S * (S - D1) * (S - D2) * (S - D3))
+        D1=np.abs(D1)
+        D2=np.abs(D2)
+        D3=np.abs(D3)
+        S=(D1+D2+D3)/2.
+        A=np.sqrt( np.abs(S * (S - D1) * (S - D2) * (S - D3)) )
+#        A=np.sqrt( S * (S - D1) * (S - D2) * (S - D3) )
         AreaE[k]=A
     return AreaE
 

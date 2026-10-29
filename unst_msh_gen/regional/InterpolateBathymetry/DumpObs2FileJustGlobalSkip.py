@@ -22,10 +22,10 @@ import netCDF4 as nc
 import sys
 from scipy.interpolate import RegularGridInterpolator
 
-import itertools
+#import itertools
 
-import FiniteElementMeshRoutines as FE
-import GaussMarkov as GM
+#import FiniteElementMeshRoutines as FE
+#import GaussMarkov as GM
 
 print("Defining meshname and other variables from file DefineVariables.py")
 with open("DefineVariables.py", "r") as file:
@@ -46,7 +46,8 @@ x0=data["lon"][:]
 y0=data["lat"][:]
 print(fl)
 skip=3
-skip=10
+skip=10 #Tiny
+#skip=20 #Nano
 if filetype[j] <2 : #gridded data
     Z0=data["z"][:,:]
     nx=len(x0)
