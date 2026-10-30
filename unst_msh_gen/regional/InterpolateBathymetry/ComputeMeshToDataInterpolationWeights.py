@@ -4,66 +4,6 @@ import os
 import FiniteElementMeshRoutines as FE
 from scipy.sparse import diags
 
-import concurrent.futures
-
-def loadWW3Mesh(fl):
-    f=open(fl, 'r')
-    header = f.readline() 
-    header = f.readline() 
-    header = f.readline() 
-    header = f.readline() 
-    header = f.readline() # number of nodes
-    nn=int(header)
-    print("nn = "+str(nn))
-    xi=np.zeros(nn)
-    yi=np.zeros(nn)
-    zi=np.zeros(nn)
-    k=0
-    for i in range(nn):
-        A = f.readline()
-        values = A.split(" ")
-        if len(values)>4:
-            xi[k]=values[2]
-            yi[k]=values[4]
-            zi[k]=values[6]
-        else:
-            xi[k]=values[1]
-            yi[k]=values[2]
-            zi[k]=values[3]
-        k=k+1
-    print("number of nodes read: "+str(k))
-    header = f.readline() 
-    header = f.readline() 
-    header = f.readline() # number of elements
-    ne=int(header)#includes boundary nodes and actual elements
-    print("ne="+str(ne)+" -includes boundary nodes")
-    nbnd=0
-    bnd=[]
-    eix=np.zeros((ne,3), dtype=int)
-    k=0
-    for i in range(ne):
-        A = f.readline()
-        values = A.split(" ")
-        if len(values) == 6:
-            if int(values[2])==2:
-                bnd.append(int(values[5]))
-                nbnd=nbnd+1
-        if len(values)>15:
-            eix[k,0]=int(values[12])
-            eix[k,1]=int(values[14])
-            eix[k,2]=int(values[16])
-            k=k+1
-        elif len(values)>7:
-            eix[k,0]=int(values[6])
-            eix[k,1]=int(values[7])
-            eix[k,2]=int(values[8])
-            k=k+1
-    ei=eix[range(k),:]
-    print("number of open boundary nodes read: "+str(nbnd))
-    print("number of elements read: "+str(k))
-    return xi, yi, zi, ei, bnd
-
-
 deg2rad= np.pi / 180.
 deg2kmY=111.
 def QuickDistance(lat1, lon1, lats2, lons2):
@@ -71,35 +11,6 @@ def QuickDistance(lat1, lon1, lats2, lons2):
     d = np.min( ((lat1-lats2)*deg2kmY)**2 + ((lon1-lons2)*deg2kmX)**2  )
     d = np.sqrt(d)
     return d
-
-def WriteInterpolationWeightsToNetCDF(weights_file,row,col,weights,Nrows,Ncols):
-    #create a esmpy style sparse matrix netcdf file
-    n_s=len(weights)
-
-    if isinstance(row , list):
-        row      = np.array( row  )
-    if isinstance( col, list):
-        col      = np.array( col )
-    if isinstance( weights, list):
-        weights = np.array( weights )
-
-    with nc.Dataset(weights_file, 'w', format='NETCDF4') as ncout:
-            
-        ncout.createDimension('n_s' , n_s)
-        ncout.setncattr("Nrows", Nrows)
-        ncout.setncattr("Ncols", Ncols)
-            
-        r_var=ncout.createVariable('row', 'i4', ('n_s',))
-        r_var.long_name     = 'row index'
-        r_var[:]=row[:]
-            
-        c_var=ncout.createVariable('col', 'i4', ('n_s',))
-        c_var.long_name     = 'column index'
-        c_var[:]=col[:]
-            
-        s_var=ncout.createVariable('S', 'f4', ('n_s',))
-        s_var.long_name     = 'matrix value'
-        s_var[:]=weights[:]
 
 def IsInElement(x,y,xp,yp):
     IsIn=False
@@ -275,7 +186,7 @@ def WriteInterpJobscriptSLURM(jobfl,flin,mshfl,Njobs) : #, ComputeNodes):
     flinslash=flin.rfind('/')+1
     meshslash=mshfl.rfind('/')+1
     meshname=mshfl[meshslash:len(mshfl)-3]
-    TmpOutDir="InterpWeights."+meshame+"."+flin[flinslash:len(flin)-3]
+    TmpOutDir="InterpWeights."+meshname+"."+flin[flinslash:len(flin)-3]
     
     #weights_file = TmpOutDir+"/Part.IntrpWghts."+str(jobID)+".txt"
     meshslash=mshfl.rfind('/')+1
@@ -348,7 +259,8 @@ weights_file = TmpOutDir+"/Part.IntrpWghts."+str(jobID)+".txt"
 
 print("saving output to:"+weights_file)
 
-x, y, z, e, bnd = loadWW3Mesh(mshfl)
+x, y, z, e, bnd=FE.loadWW3Mesh(mshfl)
+
 nn=len(x)
 
 RWPS_LON=True
