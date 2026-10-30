@@ -1,0 +1,31 @@
+#!/bin/bash 
+#SBATCH --job-name=CRM_interp_masterscript 
+#SBATCH --ntasks=1 
+#SBATCH --time=08:00:00 
+#SBATCH --output=mpi_test_%j.log 
+#SBATCH --error=%j.err 
+#SBATCH --account=marine-cpu 
+#SBATCH --nodes=1 
+##SBATCH --ntasks-per-core=32 
+#SBATCH --exclusive 
+
+N=384
+#datafile=GlobalDataPointsTiny.nc
+datafile=AllDataPoints.nc
+#meshfile=meshes/rwps.oc_1500m_30km.msh
+meshfile=meshes/rwps.oc_500m_10km.msh
+
+module purge 
+
+source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate 
+
+pip list 
+
+python ComputeMeshToDataInterpolationWeights.py $datafile $meshfile $N
+
+sbatch --wait ComputeMeshToObsInterpWeightsSLURM
+
+python convert_weights_to_netcdf.py $datafile $meshfile $N convert_weights_to_netcdf.out
+
+python MinimizeQuadForm.py  $datafile $meshfile $N > MinimizeQuadForm.out
+
