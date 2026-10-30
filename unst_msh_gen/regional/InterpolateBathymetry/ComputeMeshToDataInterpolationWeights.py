@@ -131,17 +131,13 @@ def compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi):
             jg = raw_indices[sorted_sub_indices]
             j=FindElement(x,y,e0[jg,:],x0,y0)
             if j < 0:
-                print("couldn't find element for point : "+ str(k))
-                print(str(x0)+" : "+str(y0))
                 FoundElement[k]=0
                 if len(jg)>0:
                    j = jg[0]
                 else:
                    j=0
-                print("using closest element at distance : "+ str(distances[j]))
             else:
                 j=jg[j]
-
         elenum[k] = j
         Dist2EleCenter[k] = distances[j]
         xl = x[e0[j, :]]
@@ -279,9 +275,23 @@ if RWPS_LON :
     j=np.where(xi>90.) # should be empty
     xi[j]=xi[j]-360.
 
+# rudimentary data reduction 
+jg=np.where(  (
+            np.logical_and( 
+            np.logical_and( xi>=np.min(x), xi<=np.max(x)), 
+            np.logical_and( yi>=np.min(y), yi<=np.max(y)) )
+            ) )
+n1=len(jg)
+n0=len(xi)
+print("removing data points outside of mesh range. Reduced numnber of data points from "+str(n0)+" to "+str(n1) )
+xi=xi[jg]
+yi=yi[jg]
+zi=zi[jg]
+ei=ei[jg]
+
 nni=len(xi)
 
-# divide point bathymetry data set for jobID=0 ... Njobs-1
+# divide remaining point bathymetry data set for jobID=0 ... Njobs-1
 def split_with_numpy(n, m):
   return [list(arr) for arr in np.array_split(range(n), m)]
 
