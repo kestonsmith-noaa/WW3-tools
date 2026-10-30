@@ -71,7 +71,6 @@ def construct_gradient_operators_on_elements(x, y, elements):
 
     return Dx, Dy, A
 
-
 #main program
 import sys
 import numpy as np
@@ -79,255 +78,63 @@ import netCDF4 as nc
 import xarray as xr
 import scipy.sparse as sp
 
-
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import cg
 
 nargin = len(sys.argv) - 1
 flin=sys.argv[1]
 mshfl=sys.argv[2]
-ComputeWeights=True
-if nargin>2 :
-    if int(sys.argv[3])==0:
-        ComputeWeights=False
-
-weights=np.loadtxt('weights.txt')
-nodes=np.loadtxt('nodes.txt',dtype=int)
-elenum=np.loadtxt('elenum.txt',dtype=int)
-#np.savetxt('Dist2EleCenter.txt', Dist2EleCenter)
-FoundElement=np.loadtxt('FoundElement.txt',dtype=int)
-zi=np.loadtxt('zi.txt')
-ei=np.loadtxt('ei.txt')
-
-print("weights.shape")
-print(weights.shape)
-print(FoundElement)
-
-print("data zmax = " +str(np.max(zi)) )
-print("data zmin = " +str(np.min(zi)) )
-print("data zmean = " +str(np.mean(zi)) )
-ExcludeLand=False
-if ExcludeLand :
-    jneg=np.where( zi <= 0)
-    jg  =np.where( FoundElement==1 )
-    jg=jg[0]
-    #jg=list(set(jg) & set(jneg))
-    print("jg")
-    print(jg)
-    jg=np.array(np.intersect1d(jg,jneg))
-    print(jg)
-#    jg=np.where( np.logical_and( zi < 0., FoundElement==1 ) )
-else:
-    jg=np.where(FoundElement==1)
-    jg=jg[0]
-
-
-nd=len(jg)
-print(str(nd) + "= nd")
-
-print("jg")
-print(jg)
-
-n=0
-row=np.zeros(nd*3, dtype=int)
-col=np.zeros(nd*3, dtype=int)
-val=np.zeros(nd*3)
-for k in range(nd):
-    for j in range(3):
-        row[n]=k
-        col[n]=nodes[jg[k],j]
-        val[n]=weights[jg[k],j]
-        n=n+1
-n_s=n
-
-#zi=np.loadtxt('zi.txt')
-zi=zi[jg]
-#ei=np.loadtxt('ei.txt')
-ei=ei[jg]
-print("data zmax filtered= " +str(np.max(zi)) )
 
 x, y, z, e, bnd=FE.loadWW3Mesh(mshfl)
 
-#x,y,e,z=loadWW3Mesh(mshfl)
 nn=len(x)
 
+flinslash=flin.rfind('/')+1
 meshslash=mshfl.rfind('/')+1
-mshnm=mshfl[meshslash:len(mshfl)-4]
-flout=flin[0 : -3]+".weights."+mshnm[0 : -3 ]+".nc"
+meshname=mshfl[meshslash:len(mshfl)-3]
+flout=flin[0 : -3]+".weights."+meshname[0 : -3 ]+".nc"
 
-with nc.Dataset(flout, 'w', format='NETCDF4') as ncout:
-    ncout.createDimension('n_s' , n_s)
-    ncout.setncattr("Nrows", nd)
-    ncout.setncattr("Ncols", nn)
-    ncout.setncattr("SrcFieldType", "unstructured") 
-    
-    r_var=ncout.createVariable('row', 'i4', ('n_s',))
-    r_var.long_name     = 'row index'
-    r_var[:]=row[:]
-    
-    c_var=ncout.createVariable('col', 'i4', ('n_s',))
-    c_var.long_name     = 'column index'
-    c_var[:]=col[:]
-    
-    s_var=ncout.createVariable('S', 'f8', ('n_s',))
-    s_var.long_name     = 'matrix value'
-    s_var[:]=val[:]
+# read in Sparse matrix information
+flin="SparseMatrix."+meshname+flin[flinslash:len(flin)-3]+".nc"
+data = nc.Dataset(flin,"r")
+Nrows = getattr(data, "Nrows")
+Ncols = getattr(data, "Ncols")
+row=np.array(data["row"][:])
+col=np.array(data["col"][:])
+S  =np.array(data["S"][:])
+# The interpolation matrix from mesh nodes to bathymetry points
+A = sp.coo_matrix((S, (row, col-1)), shape=(Nrows, Ncols)).tocsr() # NOTE: col is mesh node number, 1 .. Ncols  
 
+zi = np.array(data["z"][:]) # bathymetry observations
+ei = np.array(data["err"][:]) # bathymetry observation standard error
 
-matrix = sp.coo_matrix((val, (row, col-1)), shape=(nd,nn)).tocsr()
+#diag=range(len(ei))
+#R = sp.coo_matrix((1./ei, (diag, diag)), shape=(nd,nd)).tocsr()
+R = diags(ei, format="csr") # diagonal matrux of obs std err
 
+# construct smoothness penalty terms 
+# minimize misfit +  < df/dx ^2 + df/dy ^2 >
+Dx,Dy, EleArea=construct_gradient_operators_on_elements(x, y, e) # gradient operators 
 
-#zero out land
-#jp=np.where(zi>0.)
-#zi[jp]=0.
-#ignore land
-jp=np.where(zi>0.)
-ei[jp]=ei[jp]*10000.
-
-print(matrix)
-print(zi)
-print(zi.shape)
-print(x.shape)
-print(matrix.shape)
-
-A=matrix
-
-# minimize
-# f(x)=(A x - z )^T (Ax  -z)
-# f(x) = x^T A^T A x  -2 (A x)^T z - z^T z
-# f(x) = x^T A^T A x  -2 (A x)^T z + c
-# f(x) = x^T A^T A x  -2 x A^T z + c
-# f(x)     ~= (1/2) x^T G x - b^t x
-# where:
-# b = 2 * A^Tz
-# G = 2 * A^T A
-
-G= 2.* np.transpose(A) * A
-b =2.* np.transpose(A)*zi
-print(G.shape)
-print(b.shape)
-#Set initial guess at bathy based on current mesh z
-z0=-z;
-jup=np.where(z0>0.)
-z0[jup]=0.
-tol=10^-6
-#x, info = cg(C, b, tol=1e-6)
-x, info = cg(G, b)
-#x, info = cg(G, b, x0=z0,rtol=tol)
-print(info)
-print(x)
-
-np.savetxt(mshnm+".optbat.txt",x)
-
-r=A*x-zi
-np.savetxt(mshnm+".residual.txt",r)
-
-diag=range(nd)
-R= sp.coo_matrix((1./ei, (diag, diag)), shape=(nd,nd)).tocsr()
-
-# minimize
-# f(x)=(A x - z )^T COV^(-1) (Ax  -z)
-# f(x)=(A x - z )^T diag(1./r/r) (Ax  -z)
-# where: r =observation standard err =>ei
-# f(x) = [( A x -z ) diag(1./r) ] [( A x -z ) diag(1./r) ]
-# f(x) = [( A x -z ) R]^T [( A x -z ) R]   
-# f(x) = [ A R x - R z ]^T [ A R x - R z ]
-#
-# f(x)     ~= (1/2) x^T G x - b^t x
-# where:
-# b = 2 * A^T R z
-# G = 2 * [A R ]^T [A R]
-
-AR= R * A
-Rz=R*zi
-
-G= 2.* np.transpose(AR) * AR
-b =2.* np.transpose(AR)*Rz
-
-#x, info = cg(G, b)
-z0=-z;
-jup=np.where(z0>0.)
-z0[jup]=0.
-x, info = cg(G, b, x0=z0)
-#x, info = cg(G, b, x0=z0,rtol=tol)
-np.savetxt(mshnm+".optbatObsErr.txt",x)
-
-r=A*x-zi
-np.savetxt(mshnm+".residualObsErr.txt",r)
-
-r=R*(A*x-zi)
-np.savetxt(mshnm+".residualObsErrNormalized.txt",r)
-
-# introduce reguralization: penalize df/dx ^2 + df/dy ^2
-x, y, z, e, bnd=FE.loadWW3Mesh(mshfl)
-
-Dx,Dy, EleArea=construct_gradient_operators_on_elements(x, y, e)
-
-np.savetxt('EleArea.txt',EleArea)
-
-cooy = Dy.tocoo()
-Dy3 = np.column_stack((cooy.row, cooy.col, cooy.data))
-np.savetxt('Dy.txt',Dy3)
-
-coox = Dx.tocoo()
-Dx3 = np.column_stack((coox.row, coox.col, coox.data))
-np.savetxt('Dx.txt',Dx3)
-
-M=np.transpose(Dx)*Dx + np.transpose(Dy)*Dy # squared slope penalty
-
-# Note the other variant is to minimize < df/dx ^2 + df/dy ^2 >
-# in which case we want:
-# M=np.transpose(Dx)*diag(EleArea)*Dx + np.transpose(Dy)*diag(EleArea)Dy # squared slope penalty
-
-gamma=10.**-6
-
-# minimize rms_misfit + d/dx ^2 + d/dy ^2 
-# g(x)=(A f - z )^T COV^(-1) (A f  -z) + lamda (f^t Dx^T Dx  f + f^t Dy^T Dy  f)
-# so: (f^t Dx^t Dx  f + f^t Dy^t Dy  f)= f^t (Dx^t Dx + Dy^t Dy) f = f^t M f
-# let: M=(Dx^t Dx + Dy^t Dy)
-# g(x) = [ A R f - R z ]^t [ A R f - R z ] + lambda f^t M f
-#      = c+ f^t [(R^t A^t A R] f - 2 * [A R x]^t z + lambda f^t M f
-#      = c+ f^t [(R [A^t A] R + lambda*M] f - 2 [A^T R z]^t f   
-# g(x)     ~= (1/2) x^T G x - b^t x
-# where:
-# b = 2 * A^t R z
-# G = 2 * [A R ]^t [A R] + 2 * lambda*M
-
-
-G= 2.* np.transpose(AR) * AR + 2.*gamma*M
-b =2.* np.transpose(AR)*Rz
-
-#x, info = cg(G, b)
-z0=-z;
-jup=np.where(z0>0.)
-z0[jup]=0.
-x, info = cg(G, b, x0=z0)
-#x, info = cg(G, b, x0=z0,rtol=tol)
-np.savetxt(mshnm+".optbatReg.txt",x)
-r=A*x-zi
-np.savetxt(mshnm+".residualReg.txt",r)
-r=R*(A*x-zi)
-np.savetxt(mshnm+".residualRegNormalized.txt",r)
-
-# minimize < df/dx ^2 + df/dy ^2 >
-ne, three=e.shape
-diag=range(ne)
 e0=e-1
 EleArea0=FE.ElementArea(x, y, e0)
 
-W = diags(np.sqrt(EleArea), format="csr")
+W = diags(np.sqrt(EleArea), format="csr") # square root of element area
+W = diags(np.sqrt(EleArea0), format="csr") # square root of element area
+
 WDx=W*Dx
 WDy=W*Dy
 
-#M=np.transpose(Dx)*W*Dx + np.transpose(Dy)*W*Dy # squared slope penalty,spatial integral
 M=np.transpose(WDx)*WDx + np.transpose(WDy)*WDy # squared slope penalty,spatial integral
-print(M)
 
 gamma=10.**(-9)
 gamma=10.**(-2) # shows effect
 gamma=10.**(-3) # shows effect
-gamma=10.**(-2) # shows effect
+gamma=10.**(-4) # shows effect
+#gamma=10.**(-2) # shows effect
 
+AR = R * A
+Rz = R * zi
 G= 2.* np.transpose(AR) * AR + 2.*gamma*M
 b =2.* np.transpose(AR)*Rz
 
@@ -336,22 +143,19 @@ jup=np.where(z0>0.)
 z0[jup]=0.
 #x, info = cg(G, b, x0=z0,rtol=tol)
 x, info = cg(G, b, x0=z0)
-
-np.savetxt(mshnm+".optbatRegI.txt",x)
+np.savetxt(meshname+"optbat.txt",x)
 
 r=A*x-zi
-np.savetxt(mshnm+".residualRegI.txt",r)
-
+np.savetxt(meshname+"residual.txt",r)
 SP=np.sum(r**2)
 print("Misfit RMS^2 = "+str(SP))
 
 r=R*(A*x-zi)
-np.savetxt(mshnm+".residualRegINormalized.txt",r)
-
+np.savetxt(meshname+"residualNormalized.txt",r)
 SP=np.sum(r**2)
 print("MisfitPenalty = "+str(SP))
 
 r=WDx*x
-np.savetxt(mshnm+".SmoothPenalty.txt",r)
+np.savetxt(meshname+"SmoothPenalty.txt",r)
 SP=gamma*np.sum(r**2)
 print("SmoothPenalty = "+str(SP))

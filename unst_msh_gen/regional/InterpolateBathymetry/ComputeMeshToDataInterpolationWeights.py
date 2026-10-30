@@ -267,16 +267,19 @@ def compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi):
 
 import os
 
-def WriteInterpJobscriptSLURM(jobfl,flin,mshfl,Njobs)#, ComputeNodes):
+def WriteInterpJobscriptSLURM(jobfl,flin,mshfl,Njobs) : #, ComputeNodes):
     
-    WghtFl="STOFS.wght."+mshfl[meshslash:len(mshfl)-4]+".txt"
-    WghtFlNetCDF="STOFS.wght."+mshfl[meshslash:len(mshfl)-4]+".nc"
+#    WghtFl="STOFS.wght."+mshfl[meshslash:len(mshfl)-4]+".txt"
+#    WghtFlNetCDF="STOFS.wght."+mshfl[meshslash:len(mshfl)-4]+".nc"
     
     flinslash=flin.rfind('/')+1
-    TmpOutDir="InterpWeights."+flin[flinslash:len(flin)-3]
+    meshslash=mshfl.rfind('/')+1
+    meshname=mshfl[meshslash:len(mshfl)-3]
+    TmpOutDir="InterpWeights."+meshame+"."+flin[flinslash:len(flin)-3]
     
-    weights_file = TmpOutDir+"/Part.IntrpWghts."+str(jobID)+".txt"
-    
+    #weights_file = TmpOutDir+"/Part.IntrpWghts."+str(jobID)+".txt"
+    meshslash=mshfl.rfind('/')+1
+    meshname=mshfl[meshslash:len(mshfl)-3]
     with open(jobfl, 'w') as f:
         f.write("#!/bin/bash \n")
         f.write("#SBATCH --job-name=FindInterpWeightsMasterscript \n")
@@ -320,7 +323,9 @@ flin=sys.argv[1]
 mshfl=sys.argv[2]
 
 flinslash=flin.rfind('/')+1
-TmpOutDir="InterpWeights."+flin[flinslash:len(flin)-3]
+meshslash=mshfl.rfind('/')+1
+meshname=mshfl[meshslash:len(mshfl)-3]
+TmpOutDir="InterpWeights."+meshname+flin[flinslash:len(flin)-3]
 
 #if nargin==3 then write the parallel jobcard that carries out the interpolation weight calculation
 if nargin ==3 :
@@ -330,42 +335,44 @@ if nargin ==3 :
         os.remove(TmpOutDir+"/*.txt")
     except:
         print("directory "+TmpOutDir+" is alread empty")
-    WriteInterpJobscriptSLURM("jobcardcompute_unstr_to_rwps_interp_weightsSLURM",flin,mshfl,Njobs) #, 1)
+    WriteInterpJobscriptSLURM("jobcardComputeMeshToObsInterpWeightsSLURM",flin,mshfl,Njobs)
     print("Made parallel jobcards to create interpolation weights with "+str(Njobs)+" processes. Next step:")
     print("sbatch jobcardcompute_unstr_to_rwps_interp_weightsSLURM")
     sys.exit()
-
+    
+# only continue if nargin == 4
 #if nargin==4 then do the part of the mesh for jobID of Njobs
-if nargin == 4:
-    jobID=int(sys.argv[3])
-    Njobs=int(sys.argv[4])
-    weights_file = TmpOutDir+"/Part.IntrpWghts."+str(jobID)+".txt"
+jobID=int(sys.argv[3])
+Njobs=int(sys.argv[4])
+weights_file = TmpOutDir+"/Part.IntrpWghts."+str(jobID)+".txt"
 
 print("saving output to:"+weights_file)
 
-x, y, e, z = iutil.loadWW3Mesh(mshfl)
-
+x, y, z, e, bnd = loadWW3Mesh(mshfl)
 nn=len(x)
+
+RWPS_LON=True
 if RWPS_LON : 
     j=np.where(x>90.) # should be empty
     x[j]=x[j]-360.
 
 #read point bathymetry data set
 data = nc.Dataset(flin,"r")
-xi=np.asarray(data0["lon"][:])
-yi=np.asarray(data0["lat"][:])
-zi=np.asarray(data0["z"][:])
+xi=np.asarray(data["lon"][:])
+yi=np.asarray(data["lat"][:])
+zi=np.asarray(data["z"][:])
 ei=np.array(data["StdErr"][:])
 
 if RWPS_LON :
     j=np.where(xi>90.) # should be empty
-    xi[j]=x[j]-360.
+    xi[j]=xi[j]-360.
 
 nni=len(xi)
 
 # divide point bathymetry data set for jobID=0 ... Njobs-1
 def split_with_numpy(n, m):
   return [list(arr) for arr in np.array_split(range(n), m)]
+
 all_job_point_sets=split_with_numpy(nni, Njobs)
 point_set=all_job_point_sets[jobID]
 xi=xi[point_set]
@@ -373,8 +380,8 @@ yi=yi[point_set]
 zi=zi[point_set]
 ei=ei[point_set]
 
-if nargin == 4:
-    weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi)
-    AllOutMatrix=np.column_stack( (nodes, weights, point_set, zi, FoundElement, Dist2EleCenter) )
-    np.savetxt(weights_file, AllOutMatrix.T, fmt='%d %d %d %.6f %.6f %.6f %d %f %d %f')
+weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi)
+
+AllOutMatrix=np.column_stack( ( point_set, zi, ei, nodes, weights, elenum, FoundElement, Dist2EleCenter) )
+np.savetxt(weights_file, AllOutMatrix, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
 
