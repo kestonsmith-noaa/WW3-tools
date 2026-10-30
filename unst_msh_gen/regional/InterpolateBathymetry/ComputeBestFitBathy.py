@@ -4,6 +4,110 @@ import os
 import FiniteElementMeshRoutines as FE
 from scipy.sparse import diags
 
+def compute_mesh_to_point_interp_weightsG(k):
+    N=12
+    x0=xi[k]
+    y0=yi[k]
+    deg2kmX=np.cos( np.pi * y0 / 180.)*deg2kmY
+    distances = np.abs( deg2kmX*(x0 - xc) + 1j*deg2kmY*(y0 - yc))
+    raw_indices = np.argpartition(distances, N)[:N]
+    sorted_sub_indices = np.argsort(distances[raw_indices])
+    jg = raw_indices[sorted_sub_indices]
+        
+    j=FindElement(x,y,e0[jg,:],x0,y0)
+    FoundElement[k]=1
+    if j < 0:
+        print("couldn't find element for point:")
+        print(str(x0)+" : "+str(y0))
+        FoundElement[k]=0
+        j=0
+    j=jg[j]
+    elenum[k] = j
+    Dist2EleCenter[k] = distances[j]
+    xl = x[e0[j, :]]
+    yl = y[e0[j, :]]
+
+    xt = np.array([xl[0], xl[1], x0, xl[0]])
+    yt = np.array([yl[0], yl[1], y0, yl[0]])
+    a3 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+        # Area of triangle formed by vertices 3, 1, and point (a2)
+    xt = np.array([xl[2], xl[0], x0, xl[2]])
+    yt = np.array([yl[2], yl[0], y0, yl[2]])
+    a2 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+        # Area of triangle formed by point, vertices 2, 3 (a1)
+    xt = np.array([x0, xl[1], xl[2], x0])
+    yt = np.array([y0, yl[1], yl[2], y0])
+    a1 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+    total_area = a1 + a2 + a3
+    weights[k,:] = [a1, a2, a3] / total_area
+    if np.min(weights[k,:])<0:
+        weights[k,:]=[1/3,1/3,1/3]
+        FoundElement[k]=0
+    nodes[k,:] = e0[j, :] + 1 #<- indexed 1 .. nn
+    return 0
+
+
+
+def loadWW3Mesh(fl):
+    print("mesh file="+fl)
+    f=open(fl, 'r')
+    header = f.readline()
+    header = f.readline()
+    header = f.readline()
+    header = f.readline()
+    header = f.readline() # number of nodes
+    nn=int(header)
+    print("nn = "+str(nn))
+    xi=np.zeros(nn)
+    yi=np.zeros(nn)
+    zi=np.zeros(nn)
+    k=0
+    for i in range(nn):
+        A = f.readline()
+        B=A.lstrip()
+        values = B.split(" ")
+        if len(values)>5:
+            xi[k]=values[2]
+            yi[k]=values[4]
+            zi[k]=values[6]
+        else:
+            xi[k]=values[1]
+            yi[k]=values[2]
+            zi[k]=values[3]
+        k=k+1
+    print("number of nodes read: "+str(k))
+    header = f.readline()
+    header = f.readline()
+    header = f.readline() # number of elements
+    ne=int(header)#includes boundary nodes and actual elements
+    print("ne="+str(ne)+" -includes boundary nodes")
+    nbnd=0
+    bnd=[]
+    eix=np.zeros((ne,3), dtype=int)
+    k=0
+    for i in range(ne):
+        A = f.readline()
+        values = A.split(" ")
+        if len(values) == 6:
+            if int(values[2])==2:
+                bnd.append(int(values[5]))
+                nbnd=nbnd+1
+        if len(values)>15:
+            eix[k,0]=int(values[12])
+            eix[k,1]=int(values[14])
+            eix[k,2]=int(values[16])
+            k=k+1
+        elif len(values)>7:
+            eix[k,0]=int(values[6])
+            eix[k,1]=int(values[7])
+            eix[k,2]=int(values[8])
+            k=k+1
+    ei=eix[range(k),:]
+    print("number of open boundary nodes read: "+str(nbnd))
+    print("number of elements read: "+str(k))
+    return xi, yi, ei, zi
+
+
 def loadWW3Mesh(fl):
     print("mesh file="+fl)
     f=open(fl, 'r')
@@ -264,11 +368,11 @@ def compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi):
             print(f"Progress: {k+1}/{n_points}")
     return weights, nodes, elenum, Dist2EleCenter, FoundElement
 
-
-def compute_mesh_to_point_interp_weights(x, y, e0, xi, yi, xc, yc):
+def compute_mesh_to_point_interp_weights(k,x, y, e0, xi, yi, xc, yc):
+#def compute_mesh_to_point_interp_weights(k):
     N=12
-    x0=xi
-    y0=yi
+    x0=xi[k]
+    y0=yi[k]
     deg2kmX=np.cos( np.pi * y0 / 180.)*deg2kmY
     distances = np.abs( deg2kmX*(x0 - xc) + 1j*deg2kmY*(y0 - yc))
     raw_indices = np.argpartition(distances, N)[:N]
@@ -299,21 +403,25 @@ def compute_mesh_to_point_interp_weights(x, y, e0, xi, yi, xc, yc):
     yt = np.array([y0, yl[1], yl[2], y0])
     a1 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
 
-    # Normalize to get barycentric weights
     total_area = a1 + a2 + a3
     weights = [a1, a2, a3] / total_area
-
-    # Handle extrapolation cases where target is outside element
-    # with nearest element center extrapolation
     if np.min(weights)<0:
         weights=[1/3,1/3,1/3]
         FoundElement=0
-        
     nodes = e0[j, :] + 1 #<- indexed 1 .. nn
+    return {
+        "w" : weights,
+        "n" : nodes,
+        "enum" : elenum, 
+        "d2c": Dist2EleCenter,
+        "f"  : FoundElement
+        }
     return weights, nodes, elenum, Dist2EleCenter, FoundElement
 
+from multiprocessing import Pool
 
 def compute_mesh_to_mesh_interp_weights_parallel(x, y, e, xi, yi):
+#def compute_mesh_to_mesh_interp_weights_parallel(x, y, e, xi, yi):
     deg2kmY=111.
     UseNearestEle = False #if True just use closest element center
 
@@ -322,11 +430,10 @@ def compute_mesh_to_mesh_interp_weights_parallel(x, y, e, xi, yi):
     e = np.asarray(e)
     xi = np.asarray(xi)
     yi = np.asarray(yi)
-
+    """
     # convert node indexs to 0 .. nn-1
     e0=e-1
-    e
-    print(e0)
+
     xc = np.mean(x[e0], axis=1)
     yc = np.mean(y[e0], axis=1)
     
@@ -337,17 +444,30 @@ def compute_mesh_to_mesh_interp_weights_parallel(x, y, e, xi, yi):
     nodes = np.zeros((n_points, 3), dtype=int)
     elenum = np.zeros(n_points, dtype=int)
     Dist2EleCenter = np.zeros(n_points)
-    
-    #UseNearestEle=True
     FoundElement=np.ones(n_points)
-        
-    from multiprocessing import Pool
+    """
+    #UseNearestEle=True
+
+#    if __name__ == "__main__":
+#        node_list = range(n_points)
+#        with Pool() as pool:
+#            results = pool.map(compute_mesh_to_point_interp_weightsF, node_list)
+#    print(results)
+
+    #weights = [r["w"] for r in results]
+    #nodes = [r["n"] for r in results]
+    #elenum = [r["enum"] for r in results]
+    #Dist2EleCenter = [r["d2c"] for r in results]
+    #FoundElement = [r["f"] for r in results]
 
     for k in range(n_points):
-        weights[k,:], nodes[k,:], elenum[k], Dist2EleCenter[k], FoundElement[k]=compute_mesh_to_point_interp_weights(x, y, e0, xi[k], yi[k], xc, yc)
+#        weights[k,:], nodes[k,:], elenum[k], Dist2EleCenter[k], FoundElement[k]=compute_mesh_to_point_interp_weights(x, y, e0, xi[k], yi[k], xc, yc)
+#        weights[k,:], nodes[k,:], elenum[k], Dist2EleCenter[k], FoundElement[k]=compute_mesh_to_point_interp_weightsG(k)
+        results=compute_mesh_to_point_interp_weightsG(k)
         if (k + 1) % 1000 == 0:
             print(f"Progress: {k+1}/{n_points}")
-    return weights, nodes, elenum, Dist2EleCenter, FoundElement
+    #return weights, nodes, elenum, Dist2EleCenter, FoundElement
+    return results
 
 
 # Move to the directory where the job was submitted
@@ -586,6 +706,51 @@ def WriteInterpJobscriptSLURM(fl,flin,mshfl,Njobs, ComputeNodes):
         f.write("python compute_unstr_to_rwps_interp_weights.py "+flin+" "+mshfl+" $SLURM_ARRAY_TASK_ID " + str(Njobs)+" > InterpJob.$SLURM_ARRAY_TASK_ID.out \n")
 
 
+def compute_mesh_to_points_interp_weightsF(k):
+    N=12
+    x0=xi[k]
+    y0=yi[k]
+    deg2kmX=np.cos( np.pi * y0 / 180.)*deg2kmY
+    distances = np.abs( deg2kmX*(x0 - xc) + 1j*deg2kmY*(y0 - yc))
+    raw_indices = np.argpartition(distances, N)[:N]
+    sorted_sub_indices = np.argsort(distances[raw_indices])
+    jg = raw_indices[sorted_sub_indices]
+    j=FindElement(x,y,e0[jg,:],x0,y0)
+    FoundElement[k]=1
+    if j < 0:
+        print("couldn't find element for point:")
+        print(str(x0)+" : "+str(y0))
+        FoundElement[k]=0
+        j=0
+    j=jg[j]
+    elenum[k] = j
+    Dist2EleCenter[k] = distances[j]
+    xl = x[e0[j, :]]
+    yl = y[e0[j, :]]
+
+    xt = np.array([xl[0], xl[1], x0, xl[0]])
+    yt = np.array([yl[0], yl[1], y0, yl[0]])
+    a3 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+    # Area of triangle formed by vertices 3, 1, and point (a2)
+    xt = np.array([xl[2], xl[0], x0, xl[2]])
+    yt = np.array([yl[2], yl[0], y0, yl[2]])
+    a2 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+    # Area of triangle formed by point, vertices 2, 3 (a1)
+    xt = np.array([x0, xl[1], xl[2], x0])
+    yt = np.array([y0, yl[1], yl[2], y0])
+    a1 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+    total_area = a1 + a2 + a3
+    weights[k,:] = [a1, a2, a3] / total_area
+    if np.min(weights[k,:])<0:
+        weights[k,:]=[1/3,1/3,1/3]
+        FoundElement[k]=0
+    nodes[k,:] = e0[j, :] + 1 #<- indexed 1 .. nn
+    xxx=0
+    return xxx
+#    return weights, nodes, elenum, Dist2EleCenter, FoundElement
+
+
+
 #main program
 import sys
 import numpy as np
@@ -637,9 +802,49 @@ if ComputeWeights:
     np.savetxt('yi.txt', yi)
     np.savetxt('zi.txt', zi)
     np.savetxt('ei.txt', ei)
+    
+    ##########FOR PARALLEL
+    # Initialize output arrays (Global)
+    n_points = len(xi)
+    n_elements = len(e)
+    weights = np.zeros((n_points, 3))
+    nodes = np.zeros((n_points, 3), dtype=int)
+    elenum = np.zeros(n_points, dtype=int)
+    Dist2EleCenter = np.zeros(n_points)
+    FoundElement=np.ones(n_points)
+    
+    x = np.asarray(x)
+    y = np.asarray(y)
+    e = np.asarray(e)
+    xi = np.asarray(xi)
+    yi = np.asarray(yi)
+
+    # convert node indexs to 0 .. nn-1
+    e0=e-1
+
+    xc = np.mean(x[e0], axis=1)
+    yc = np.mean(y[e0], axis=1)
+    ############################
 
 #    weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi)
-    weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights_parallel(x, y, e, xi, yi)
+#    weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights_parallel(x, y, e, xi, yi)
+# This works filling in global arrays
+#    result=compute_mesh_to_mesh_interp_weights_parallel(x, y, e, xi, yi)
+#    from multiprocessing import Pool
+#    if __name__ == "__main__":
+#        node_list = range(n_points)
+#        with Pool() as pool:
+#            results = pool.map(compute_mesh_to_point_interp_weightsG, node_list)
+    for k in range(n_points):
+        compute_mesh_to_point_interp_weightsG(k)
+#    import concurrent.futures
+#    if __name__ == "__main__":
+#        node_list = range(n_points)
+#        with concurrent.futures.ProcessPoolExecutor() as executor:
+#            results = list(executor.map(compute_mesh_to_point_interp_weightsG, node_list))
+    #print(results)
+
+
 
     np.savetxt('weights.txt', weights)
     np.savetxt('nodes.txt', nodes, fmt="%d")
