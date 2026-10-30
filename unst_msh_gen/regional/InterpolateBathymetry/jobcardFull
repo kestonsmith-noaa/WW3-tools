@@ -9,11 +9,12 @@
 ##SBATCH --ntasks-per-core=32 
 #SBATCH --exclusive 
 
-N=384
-#datafile=GlobalDataPointsTiny.nc
-datafile=AllDataPoints.nc
-#meshfile=meshes/rwps.oc_1500m_30km.msh
-meshfile=meshes/rwps.oc_500m_10km.msh
+#N=384
+N=64
+datafile=GlobalDataPointsTiny.nc
+#datafile=AllDataPoints.nc
+meshfile=meshes/rwps.oc_1500m_30km.msh
+#meshfile=meshes/rwps.oc_500m_10km.msh
 
 module purge 
 

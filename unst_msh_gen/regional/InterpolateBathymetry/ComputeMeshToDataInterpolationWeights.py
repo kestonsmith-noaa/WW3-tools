@@ -174,17 +174,12 @@ def compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi):
 
 import os
 
-def WriteInterpJobscriptSLURM(jobfl,flin,mshfl,Njobs) : #, ComputeNodes):
-    
-#    WghtFl="STOFS.wght."+mshfl[meshslash:len(mshfl)-4]+".txt"
-#    WghtFlNetCDF="STOFS.wght."+mshfl[meshslash:len(mshfl)-4]+".nc"
-    
+# write job array to jobcard
+def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs): #, ComputeNodes):
     flinslash=flin.rfind('/')+1
     meshslash=mshfl.rfind('/')+1
     meshname=mshfl[meshslash:len(mshfl)-3]
     TmpOutDir="InterpWeights."+meshname+"."+flin[flinslash:len(flin)-3]
-    
-    #weights_file = TmpOutDir+"/Part.IntrpWghts."+str(jobID)+".txt"
     meshslash=mshfl.rfind('/')+1
     meshname=mshfl[meshslash:len(mshfl)-3]
     with open(jobfl, 'w') as f:
@@ -195,26 +190,21 @@ def WriteInterpJobscriptSLURM(jobfl,flin,mshfl,Njobs) : #, ComputeNodes):
         f.write("#SBATCH --output=mpi_test_%j.log \n")
         f.write("#SBATCH --error=%j.err \n")
         f.write("#SBATCH --account=marine-cpu \n")
-        #f.write("#SBATCH --nodes="+str(ComputeNodes)+" \n")
+        f.write("#SBATCH --nodes="+str(ComputeNodes)+" \n")
         f.write("#SBATCH --ntasks-per-core=1"+" \n")
         f.write("#SBATCH --array=0-"+str(Njobs-1)+" \n")
+        f.write("#SBATCH --mem=16G \n") # EACH of the 100 tasks gets 4 GB of RAM
+
         f.write(" \n")
         f.write("source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate \n")
         f.write("pip list \n")
-        
         current_dir = os.getcwd()
-        
         f.write("cd "+current_dir+"\n")
         f.write("# calculate interpolation weights for data in parallel\n")
         f.write("python ComputeMeshToDataInterpolationWeights.py "+flin+" "+mshfl+" $SLURM_ARRAY_TASK_ID " + str(Njobs)+" > InterpJob.$SLURM_ARRAY_TASK_ID.out \n")
-        
-        JointFile="InterpWeights."+meshname+"."+flin[flinslash:len(flin)-3]+".txt"
-        FullWeightsFile=JointFile[0 : -3]
-        
-        f.write("wait; #wait for parallel array jobs to finish \n")
-        f.write("cat "+TmpOutDir+"/Part.IntrpWghts.*.txt > "+ JointFile + "\n")
-        f.write("python convert_weights_to_netcdf.py "+JointFile+" "+FullWeightsFile+" \n+")
-        f.write("submit minimization script with "+FullWeightsFile)
+        f.write("wait ; \n")
+        f.write("echo \"finished\" ; \n")
+
 
 #main program
 import sys
