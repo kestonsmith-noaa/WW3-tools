@@ -266,53 +266,43 @@ if RWPS_LON :
     xi[j]=xi[j]-360.
 
 # rudimentary data reduction 
-jg=np.where(  (
+jgm=np.where(  (
             np.logical_and( 
             np.logical_and( xi>=np.min(x), xi<=np.max(x)), 
             np.logical_and( yi>=np.min(y), yi<=np.max(y)) )
             ) )
             
 #jg=jg[0].tolist
-jg=jg[0]
-n1=len(jg)
+jgm=jgm[0]
+n1=len(jgm)
 n0=len(xi)
 print("removing data points outside of mesh range. Reduced numnber of data points from "+str(n0)+" to "+str(n1) )
-xi=xi[jg]
-yi=yi[jg]
-zi=zi[jg]
-ei=ei[jg]
+xi=xi[jgm]
+yi=yi[jgm]
+zi=zi[jgm]
+ei=ei[jgm]
 
-nni=len(xi)
-
-PBS=False
+#############################################################
 # balance node load 
 # on PBS system jobID runs from 1 to Njobs
 # on SLURM system jobID runs from 0 to Njobs-1 so this partition scheam needs to be modified
-
+nni=len(xi)
 xis=np.sort(xi)
 js = np.argindices = np.argsort(xi)
-
 mm=round(nni/Njobs)
 xil=xis[range(0,nni,mm)] # geographic partitions for parallelization
-if PBS:
-    lonW=xil[jobID-1]
-    if jobID==Njobs:
-        lonE=xis[-1]+1.
-    else:
-        lonE=xil[jobID]
-    if jobID==1:
-        lonW=xis[0]-1.
-else:
-    lonW=xil[jobID]
-    if jobID==Njobs-1:
-        lonE=xis[-1]+1.
-    else:
-        lonE=xil[jobID+1]
-    if jobID==0:
-        lonW=xis[0]-1.
 
-    latS=np.min(yi)-1.
-    latN=np.max(yi)+1.
+lonW=xil[jobID]
+if jobID==Njobs-1:
+    lonE=xis[-1]+1.
+else:
+    lonE=xil[jobID+1]
+if jobID==0:
+    lonW=xis[0]-1.
+
+latS=np.min(yi)-1.
+latN=np.max(yi)+1.
+########################################
 
 e0=e-1
 xc = np.mean(x[e0], axis=1)
@@ -330,25 +320,20 @@ print("calculating interpolation weights for [W"+str(lonW)+": E "+str(lonE)+": S
 #Find target mesh nodes in window
 jxUi=np.where( xi < np.max(xwin))[0].tolist()
 jxDi=np.where( xi >= np.min(xwin))[0].tolist()
-jyUi=np.where( yi <= np.max(ywin))[0].tolist()
-jyDi=np.where( yi >= np.min(ywin))[0].tolist()
-ji=list( set(jxUi) & set(jxDi)  & set(jyUi)   & set(jyDi)  )
+ji=list( set(jxUi) & set(jxDi) )
 xi=xi[ji]
 yi=yi[ji]
 zi=zi[ji]
 ei=ei[ji]
+point_set=jgm[ji]
 
 #Find source elements in and near window
 SearchWidth=1.0 # search rectangle extended beyond window to this number (degrees lat lon)
 xmin=np.min(x[e0],axis=1)
 xmax=np.max(x[e0],axis=1)
-ymin=np.min(y[e0],axis=1)
-ymax=np.max(y[e0],axis=1)
 jxU=np.where( xmin < np.max(xwin)+SearchWidth )[0].tolist()
 jxD=np.where( xmax > np.min(xwin)-SearchWidth )[0].tolist()
-jyU=np.where( ymin < np.max(ywin)+SearchWidth )[0].tolist()
-jyD=np.where( ymax > np.min(ywin)-SearchWidth )[0].tolist()
-je=list( set(jxU) & set(jxD)  & set(jyU)   & set(jyD)  )
+je=list( set(jxU) & set(jxD) )
 """
 jxU=np.where( xc < np.max(xwin)+SearchWidth )[0].tolist()
 jxD=np.where( xc > np.min(xwin)-SearchWidth )[0].tolist()
