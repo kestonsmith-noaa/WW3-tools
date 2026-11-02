@@ -306,6 +306,151 @@ def compute_mesh_to_point_interp_weights_box(x, y, e, xi, yi):
             print(f"Progress: {k+1}/{n_points}")
     return weights, nodes, elenum, Dist2EleCenter, FoundElement
 
+
+def IsInElementV(x,y,xp,yp):
+    npoints=len(xp)
+    IsIn=np.zeros(npoints,dtype=int)
+    c1 = (x[1] - x[0]) * (yp - y[0]) - (y[1] - y[0]) * (xp - x[0])
+    c2 = (x[2] - x[1]) * (yp - y[1]) - (y[2] - y[1]) * (xp - x[1])
+    c3 = (x[0] - x[2]) * (yp - y[2]) - (y[0] - y[2]) * (xp - x[2])
+    
+    j1=np.where( c1 > 0. )[0].tolist()
+    j2=np.where( c2 > 0. )[0].tolist()
+    j3=np.where( c3 > 0. )[0].tolist()
+    jp=list( set(j1) & set(j2) & set(j3) )
+    j1=np.where( c1 < 0. )[0].tolist()
+    j2=np.where( c2 < 0. )[0].tolist()
+    j3=np.where( c3 < 0. )[0].tolist()
+    jn=list( set(j1) & set(j2) & set(j3) )
+    
+    IsIn[jp]=1
+    IsIn[jn]=1
+    return IsIn
+
+def lenX(obj):
+    if hasattr(obj, '__len__'):
+        return obj.__len__()
+    if isinstance(obj, (int, float, complex)):
+        return 1
+
+"""
+        deg2kmX=np.cos( np.pi * yc[k] / 180.)*deg2kmY
+        distances = np.abs( deg2kmX*(xi - xc[k]) + 1j*deg2kmY*(yi - yc[k]))
+        rx= deg2kmX*(np.abs(xl[0]-xl[2] ) + np.abs( xl[2]-xl[1])  + np.abs( xl[1]-xl[0]) )
+        ry= deg2kmY*(np.abs(yl[0]-yl[2] ) + np.abs( yl[2]-yl[1])  + np.abs( yl[1]-yl[0]) )
+        ji=np.where( distances < rx+ry )
+        jf =np.where(FoundElement==0)[0].tolist()
+        jxU=np.where( xi[jf] <= xmax[k] )[0].tolist()
+        jf=[ jf[jj] for jj in jxU ]
+        jxD=np.where( xi[jf] >= xmin[k] )[0].tolist()
+        jf=[ jf[jj] for jj in jxD ]
+        jyU=np.where( yi[jf] <= ymax[k] )[0].tolist()
+        jf=[ jf[jj] for jj in jyU ]
+        jyD=np.where( yi[jf] >= ymin[k] )[0].tolist()
+        jf=[ jf[jj] for jj in jyD ]
+        ji=jf
+"""
+
+def compute_mesh_to_point_interp_weights_element_loop(x, y, e, xi, yi):
+    
+    # Convert to numpy arrays
+    from itertools import chain
+    deg2kmY=111.
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+    e = np.asarray(e)
+    xi = np.asarray(xi)
+    yi = np.asarray(yi)
+    
+    # convert node indexs to 0 .. nn-1
+    e0=e-1
+    xc = np.mean(x[e0], axis=1)
+    yc = np.mean(y[e0], axis=1)
+    
+    lleps=10.**-8
+    print("lleps="+str(lleps))
+    
+    xmin = np.min(x[e0], axis=1)- lleps
+    ymin = np.min(y[e0], axis=1)- lleps
+    xmax = np.max(x[e0], axis=1)+ lleps
+    ymax = np.max(y[e0], axis=1)+ lleps
+    # Initialize output arrays
+    n_points = len(xi)
+    n_elements = len(e)
+    weights = np.zeros((n_points, 3)) -99999.
+    nodes = np.zeros((n_points, 3), dtype=int) -99999
+    elenum = np.zeros(n_points, dtype=int) -99999
+    Dist2EleCenter = np.zeros(n_points) -99999.
+
+    FoundElement=np.zeros(n_points, dtype=int)
+    
+    from scipy.spatial import cKDTree
+    PC=np.vstack((xc,yc)).T
+    PI=np.vstack((xi,yi)).T
+    print(PC.shape)
+    print(PI.shape)
+    tree = cKDTree(PI)
+    ne=len(xmin)
+    jnf=range(n_points) # j not found
+    for k in range(ne):
+        xl=x[e0[k,:]]
+        yl=y[e0[k,:]]
+        rx=np.max( np.abs([xl-xc[k]]) )
+        ry=np.max( np.abs([yl-yc[k]]) )
+        r_cutoff=np.sqrt(rx**2+ry**2)
+        ji = tree.query_ball_point(PC[k,:], r=r_cutoff, workers=-1)
+        nji=lenX(ji)
+        if nji>0:
+            IsIn=IsInElementV(xl,yl,xi[ji],yi[ji])
+            npf=sum(IsIn)
+            if npf > 0 :
+                jfound=np.zeros(npf,dtype=int)
+                n=0
+                for kk in range(nji):
+                    if IsIn[kk]==1:
+                        jfound[n]=ji[kk]
+                        n=n+1
+                FoundElement[jfound]=1
+                elenum[jfound] = k
+                nodes[jfound,:] = np.ones((npf,1),dtype=np.int32)*e[k,:]
+                
+                xil=xi[jfound]
+                yil=yi[jfound]
+
+                deg2kmX=np.cos( np.pi * yc[k] / 180.)*deg2kmY
+                distances = np.abs( deg2kmX*(xil - xc[k]) + 1j*deg2kmY*(yil - yc[k]))
+                Dist2EleCenter[jfound]=distances
+                
+                for j in range(len(jfound)):
+                    # Compute barycentric coordinates using shoelace formula for areas
+                    # Area of triangle formed by vertices 1, 2, and point (a3)
+                    x0=xil[j]
+                    y0=yil[j]
+                    xt = np.array([xl[0], xl[1], x0, xl[0]])
+                    yt = np.array([yl[0], yl[1], y0, yl[0]])
+                    a3 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+                    # Area of triangle formed by vertices 3, 1, and point (a2)
+                    xt = np.array([xl[2], xl[0], x0, xl[2]])
+                    yt = np.array([yl[2], yl[0], y0, yl[2]])
+                    a2 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+                    # Area of triangle formed by point, vertices 2, 3 (a1)
+                    xt = np.array([x0, xl[1], xl[2], x0])
+                    yt = np.array([y0, yl[1], yl[2], y0])
+                    a1 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+
+                    # Normalize to get barycentric weights
+                    total_area = a1 + a2 + a3
+                    weights[jfound[j], :] = [a1, a2, a3] / total_area
+        if k % 1000 == 0:
+            print(f"Progress: {k}/{ne}")
+            print(str(k)+" : length of search points : " +str(len(ji)) + " of ne="+str(ne) )
+            print(str(np.sum(FoundElement))+" : points of " +str(len(FoundElement)) + " found")
+
+    return weights, nodes, elenum, Dist2EleCenter, FoundElement
+
+
+
 import os
 
 # write job array to jobcard
@@ -470,10 +615,12 @@ jxU=np.where( xmin < np.max(xwin)+SearchWidth )[0].tolist()
 jxD=np.where( xmax > np.min(xwin)-SearchWidth )[0].tolist()
 je=list( set(jxU) & set(jxD) )
 
-weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights(x, y, e[je,:], xi, yi)
-#weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_point_interp_weights_box(x, y, e[je,:], xi, yi)
+weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_point_interp_weights_element_loop(x, y, e[je,:], xi, yi)
 
-elenum=je[elenum]
+#recover global element number after localization
+jg=np.where(elenum > -1)[0].tolist()
+je=np.array(je)
+elenum[jg]=je[elenum[jg]]
 
 AllOutMatrix=np.column_stack( ( point_set, zi, ei, nodes, weights, elenum, FoundElement, Dist2EleCenter) )
 np.savetxt(weights_file, AllOutMatrix, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
