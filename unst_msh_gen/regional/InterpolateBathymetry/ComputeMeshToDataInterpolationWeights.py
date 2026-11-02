@@ -190,7 +190,7 @@ def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs): #, ComputeNodes):
         f.write("#SBATCH --output=mpi_test_%j.log \n")
         f.write("#SBATCH --error=%j.err \n")
         f.write("#SBATCH --account=marine-cpu \n")
-        f.write("#SBATCH --nodes="+str(ComputeNodes)+" \n")
+       # f.write("#SBATCH --nodes="+str(ComputeNodes)+" \n")
         f.write("#SBATCH --ntasks-per-core=1"+" \n")
         f.write("#SBATCH --array=0-"+str(Njobs-1)+" \n")
         f.write("#SBATCH --mem=16G \n") # EACH of the 100 tasks gets 4 GB of RAM
@@ -201,7 +201,7 @@ def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs): #, ComputeNodes):
         current_dir = os.getcwd()
         f.write("cd "+current_dir+"\n")
         f.write("# calculate interpolation weights for data in parallel\n")
-        f.write("python ComputeMeshToDataInterpolationWeights.py "+flin+" "+mshfl+" $SLURM_ARRAY_TASK_ID " + str(Njobs)+" > InterpJob.$SLURM_ARRAY_TASK_ID.out \n")
+        f.write("python -u ComputeMeshToDataInterpolationWeights.py "+flin+" "+mshfl+" $SLURM_ARRAY_TASK_ID " + str(Njobs)+" > InterpJob.$SLURM_ARRAY_TASK_ID.out \n")
         f.write("wait ; \n")
         f.write("echo \"finished\" ; \n")
 
@@ -271,6 +271,9 @@ jg=np.where(  (
             np.logical_and( xi>=np.min(x), xi<=np.max(x)), 
             np.logical_and( yi>=np.min(y), yi<=np.max(y)) )
             ) )
+            
+#jg=jg[0].tolist
+jg=jg[0]
 n1=len(jg)
 n0=len(xi)
 print("removing data points outside of mesh range. Reduced numnber of data points from "+str(n0)+" to "+str(n1) )
@@ -281,6 +284,80 @@ ei=ei[jg]
 
 nni=len(xi)
 
+PBS=False
+# balance node load 
+# on PBS system jobID runs from 1 to Njobs
+# on SLURM system jobID runs from 0 to Njobs-1 so this partition scheam needs to be modified
+
+xis=np.sort(xi)
+js = np.argindices = np.argsort(xi)
+
+mm=round(nni/Njobs)
+xil=xis[range(0,nni,mm)] # geographic partitions for parallelization
+if PBS:
+    lonW=xil[jobID-1]
+    if jobID==Njobs:
+        lonE=xis[-1]+1.
+    else:
+        lonE=xil[jobID]
+    if jobID==1:
+        lonW=xis[0]-1.
+else:
+    lonW=xil[jobID]
+    if jobID==Njobs-1:
+        lonE=xis[-1]+1.
+    else:
+        lonE=xil[jobID+1]
+    if jobID==0:
+        lonW=xis[0]-1.
+
+    latS=np.min(yi)-1.
+    latN=np.max(yi)+1.
+
+e0=e-1
+xc = np.mean(x[e0], axis=1)
+yc = np.mean(y[e0], axis=1)
+
+nn=len(x)
+
+print(e.shape)
+ne=e.shape[0]
+print(ne)
+
+xwin=[lonW,lonE]
+ywin=[latS,latN]
+print("calculating interpolation weights for [W"+str(lonW)+": E "+str(lonE)+": S "+str(latS)+": N "+str(latN)+"]")
+#Find target mesh nodes in window
+jxUi=np.where( xi < np.max(xwin))[0].tolist()
+jxDi=np.where( xi >= np.min(xwin))[0].tolist()
+jyUi=np.where( yi <= np.max(ywin))[0].tolist()
+jyDi=np.where( yi >= np.min(ywin))[0].tolist()
+ji=list( set(jxUi) & set(jxDi)  & set(jyUi)   & set(jyDi)  )
+xi=xi[ji]
+yi=yi[ji]
+zi=zi[ji]
+ei=ei[ji]
+
+#Find source elements in and near window
+SearchWidth=1.0 # search rectangle extended beyond window to this number (degrees lat lon)
+xmin=np.min(x[e0],axis=1)
+xmax=np.max(x[e0],axis=1)
+ymin=np.min(y[e0],axis=1)
+ymax=np.max(y[e0],axis=1)
+jxU=np.where( xmin < np.max(xwin)+SearchWidth )[0].tolist()
+jxD=np.where( xmax > np.min(xwin)-SearchWidth )[0].tolist()
+jyU=np.where( ymin < np.max(ywin)+SearchWidth )[0].tolist()
+jyD=np.where( ymax > np.min(ywin)-SearchWidth )[0].tolist()
+je=list( set(jxU) & set(jxD)  & set(jyU)   & set(jyD)  )
+"""
+jxU=np.where( xc < np.max(xwin)+SearchWidth )[0].tolist()
+jxD=np.where( xc > np.min(xwin)-SearchWidth )[0].tolist()
+jyU=np.where( yc < np.max(ywin)+SearchWidth )[0].tolist()
+jyD=np.where( yc > np.min(ywin)-SearchWidth )[0].tolist()
+je=list( set(jxU) & set(jxD)  & set(jyU)   & set(jyD)  )
+"""
+
+"""
 # divide remaining point bathymetry data set for jobID=0 ... Njobs-1
 def split_with_numpy(n, m):
   return [list(arr) for arr in np.array_split(range(n), m)]
@@ -291,8 +368,9 @@ xi=xi[point_set]
 yi=yi[point_set]
 zi=zi[point_set]
 ei=ei[point_set]
+"""
 
-weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi)
+weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights(x, y, e[je,:], xi, yi)
 
 AllOutMatrix=np.column_stack( ( point_set, zi, ei, nodes, weights, elenum, FoundElement, Dist2EleCenter) )
 np.savetxt(weights_file, AllOutMatrix, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
