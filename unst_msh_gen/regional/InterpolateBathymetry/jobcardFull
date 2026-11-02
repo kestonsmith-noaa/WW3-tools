@@ -11,7 +11,7 @@
 
 #N=384
 N=8
-datafile=GlobalDataPointsSmallX.nc
+datafile=GlobalDataPointsX.nc
 #datafile=AllDataPoints.nc
 meshfile=meshes/rwps.oc_1500m_30km.msh
 #meshfile=meshes/rwps.oc_500m_10km.msh
@@ -24,9 +24,9 @@ pip list
 
 python ComputeMeshToDataInterpolationWeights.py $datafile $meshfile $N
 
-sbatch --wait ComputeMeshToObsInterpWeightsSLURM
+sbatch --wait jobcardComputeMeshToObsInterpWeightsSLURM
 
-python convert_weights_to_netcdf.py $datafile $meshfile $N convert_weights_to_netcdf.out
+python convert_weights_to_netcdf.py $datafile $meshfile $N >convert_weights_to_netcdf.out
 
 python MinimizeQuadForm.py  $datafile $meshfile $N > MinimizeQuadForm.out
 

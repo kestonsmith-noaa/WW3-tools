@@ -194,6 +194,10 @@ WDy=W*Dy
 
 M=np.transpose(WDx)*WDx + np.transpose(WDy)*WDy # squared slope penalty,spatial integral
 
+
+Nobs=len(zi)
+Nnodes=len(x)
+
 gamma=10.**(-9)
 gamma=10.**(-2) # shows effect
 gamma=10.**(-3) # shows effect
@@ -202,6 +206,10 @@ gamma=10.**(-4) # shows effect
 gamma=1000. # grad in meters
 gamma=100. # grad in meters
 gamma=10. # grad in meters
+
+gamma=.1*Nobs/Nnodes
+
+
 
 AR = R * A
 Rz = R * zi
