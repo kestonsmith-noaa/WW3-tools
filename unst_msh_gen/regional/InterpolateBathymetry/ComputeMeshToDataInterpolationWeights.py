@@ -99,14 +99,14 @@ def compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi):
     e = np.asarray(e)
     xi = np.asarray(xi)
     yi = np.asarray(yi)
-
+    
     # convert node indexs to 0 .. nn-1
     e0=e-1
     e
     print(e0)
     xc = np.mean(x[e0], axis=1)
     yc = np.mean(y[e0], axis=1)
-    
+
     # Initialize output arrays
     n_points = len(xi)
     n_elements = len(e)
@@ -167,6 +167,140 @@ def compute_mesh_to_mesh_interp_weights(x, y, e, xi, yi):
             weights[k, :]=1/3
 
         nodes[k, :] = e[j, :] #<- indexed 1 .. nn
+        # Progress reporting every 100 iterations
+        if (k + 1) % 1000 == 0:
+            print(f"Progress: {k+1}/{n_points}")
+    return weights, nodes, elenum, Dist2EleCenter, FoundElement
+
+def FindElementX(x,y,e,xi,yi,ne):
+    j=-9999
+    if ne > 1: 
+        j=0
+        while j < ne:
+            xl = np.squeeze(x[e[j,:]])
+            yl = np.squeeze(y[e[j,:]])
+            IsIn=IsInElement(xl,yl,xi,yi)
+            if IsIn :
+                return j
+            else:
+                j=j+1
+        if j > ne - 1:
+            j=-9999
+    else: #one element
+        xl = np.squeeze(x[e])
+        yl = np.squeeze(y[e])
+        IsIn=IsInElement(xl,yl,xi,yi)
+        if IsIn:
+            j=0
+    return j
+
+def compute_mesh_to_point_interp_weights_box(x, y, e, xi, yi):
+    """
+    Compute mesh-to-mesh interpolation weights using barycentric coordinates.
+    
+    Parameters:
+    -----------
+    x : array-like
+        X coordinates of source mesh nodes
+    y : array-like
+        Y coordinates of source mesh nodes
+    e : array-like
+        Element connectivity matrix (n_elements x 3 for triangular elements)
+        (nodes indexed from 1 to nn)
+    xi : array-like
+        X coordinates of target points
+    yi : array-like
+        Y coordinates of target points
+        
+    Returns:
+    --------
+    weights : ndarray
+        Interpolation weights (n_points x 3)
+    nodes : ndarray
+        Node indices for each point (n_points x 3)
+    elenum : ndarray
+        Element number for each point (n_points,)
+    Dist2EleCenter : ndarray
+        Distance to element center for each element
+    """
+    
+    # Convert to numpy arrays
+    
+    deg2kmY=111.
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+    e = np.asarray(e)
+    xi = np.asarray(xi)
+    yi = np.asarray(yi)
+    
+    # convert node indexs to 0 .. nn-1
+    e0=e-1
+    xc = np.mean(x[e0], axis=1)
+    yc = np.mean(y[e0], axis=1)
+    
+    lleps=10.**-6
+    xmin = np.min(x[e0], axis=1)- lleps
+    ymin = np.min(y[e0], axis=1)- lleps
+    xmax = np.max(x[e0], axis=1)+ lleps
+    ymax = np.max(y[e0], axis=1)+ lleps
+    # Initialize output arrays
+    n_points = len(xi)
+    n_elements = len(e)
+    weights = np.zeros((n_points, 3)) -99999.
+    nodes = np.zeros((n_points, 3), dtype=int) -99999
+    elenum = np.zeros(n_points, dtype=int) -99999
+    Dist2EleCenter = np.zeros(n_points) -99999.
+
+    FoundElement=np.ones(n_points)
+    for k in range(n_points):
+        x0=xi[k]
+        y0=yi[k]
+        jxU=np.where( x0 <= xmax )[0].tolist()
+        jxD=np.where( x0 >= xmin )[0].tolist()
+        jyU=np.where( y0 <= ymax )[0].tolist()
+        jyD=np.where( y0 >= ymin )[0].tolist()
+        ji=list( set(jxU) & set(jxD) & set(jyU) & set(jyD) )
+        print(str(k)+" : length of searcg elements : " +str(len(ji)) )
+        if len(ji) > 0 :
+            deg2kmX=np.cos( np.pi * y0 / 180.)*deg2kmY
+            distances = np.abs( deg2kmX*(x0 - xc[ji]) + 1j*deg2kmY*(y0 - yc[ji]))
+            sindx = np.argsort(distances)
+            ji=np.array(ji)
+            jg = ji[sindx] # ordered from cloesest to farthest
+            j=FindElementX(x,y,e0[jg,:],x0,y0,len(jg))
+            if j < 0:
+                FoundElement[k]=0
+                j = 0 # take cloesest element but note that it is not found
+            Dist2EleCenter[k] = distances[j]
+            j=jg[j]
+            
+            xl = x[e0[j, :]]
+            yl = y[e0[j, :]]
+                
+            # Compute barycentric coordinates using shoelace formula for areas
+            # Area of triangle formed by vertices 1, 2, and point (a3)
+            xt = np.array([xl[0], xl[1], x0, xl[0]])
+            yt = np.array([yl[0], yl[1], y0, yl[0]])
+            a3 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+            # Area of triangle formed by vertices 3, 1, and point (a2)
+            xt = np.array([xl[2], xl[0], x0, xl[2]])
+            yt = np.array([yl[2], yl[0], y0, yl[2]])
+            a2 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+            # Area of triangle formed by point, vertices 2, 3 (a1)
+            xt = np.array([x0, xl[1], xl[2], x0])
+            yt = np.array([y0, yl[1], yl[2], y0])
+            a1 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+
+            # Normalize to get barycentric weights
+            total_area = a1 + a2 + a3
+            weights[k, :] = [a1, a2, a3] / total_area
+            nodes[k, :] = e[j, :] #<- indexed 1 .. nn
+
+        else :
+            FoundElement[k]=0
+            j=-99999
+        elenum[k] = j # j + 1 ?
         # Progress reporting every 100 iterations
         if (k + 1) % 1000 == 0:
             print(f"Progress: {k+1}/{n_points}")
@@ -325,6 +459,7 @@ xi=xi[ji]
 yi=yi[ji]
 zi=zi[ji]
 ei=ei[ji]
+
 point_set=jgm[ji]
 
 #Find source elements in and near window
@@ -334,28 +469,11 @@ xmax=np.max(x[e0],axis=1)
 jxU=np.where( xmin < np.max(xwin)+SearchWidth )[0].tolist()
 jxD=np.where( xmax > np.min(xwin)-SearchWidth )[0].tolist()
 je=list( set(jxU) & set(jxD) )
-"""
-jxU=np.where( xc < np.max(xwin)+SearchWidth )[0].tolist()
-jxD=np.where( xc > np.min(xwin)-SearchWidth )[0].tolist()
-jyU=np.where( yc < np.max(ywin)+SearchWidth )[0].tolist()
-jyD=np.where( yc > np.min(ywin)-SearchWidth )[0].tolist()
-je=list( set(jxU) & set(jxD)  & set(jyU)   & set(jyD)  )
-"""
-
-"""
-# divide remaining point bathymetry data set for jobID=0 ... Njobs-1
-def split_with_numpy(n, m):
-  return [list(arr) for arr in np.array_split(range(n), m)]
-
-all_job_point_sets=split_with_numpy(nni, Njobs)
-point_set=all_job_point_sets[jobID]
-xi=xi[point_set]
-yi=yi[point_set]
-zi=zi[point_set]
-ei=ei[point_set]
-"""
 
 weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_mesh_interp_weights(x, y, e[je,:], xi, yi)
+#weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_point_interp_weights_box(x, y, e[je,:], xi, yi)
+
+elenum=je[elenum]
 
 AllOutMatrix=np.column_stack( ( point_set, zi, ei, nodes, weights, elenum, FoundElement, Dist2EleCenter) )
 np.savetxt(weights_file, AllOutMatrix, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
