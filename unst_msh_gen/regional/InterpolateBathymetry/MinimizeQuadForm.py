@@ -43,9 +43,7 @@ def construct_gradient_operators_on_elements(x, y, elements):
         x1, x2, x3 = x[n_idx]
         y1, y2, y3 = y[n_idx]
         # Signed double area via cross product determinant
-        #two_area = (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1)
         two_area =np.abs( (x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1) )
-        #two_area = np.abs( x1*(y2-y3) + x2*(y3-y1) + x3*(y2-y1) )
         A[eind]=two_area/2.
         eind=eind+1
         amin=10.**-10
@@ -211,42 +209,31 @@ z0[jup]=0.
 
 flroot=meshname+flinname
 
-x, info = cg(G, b, x0=z0)
-#x, info = cg(G, b, x0=z0,rtol=10.**(-9))
-np.savetxt(flroot+"optbat.txt",x)
-
-r=A*x-zi
-#np.savetxt(flroot+"residual.txt",r)
-#x, info = cg(G, b, x0=z0)
-
 x, info = cg(G, b, x0=z0, rtol=10.**(-9))
-np.savetxt(meshname+"optbat.txt",x)
+np.savetxt(flroot+".optbat.txt",x)
 
 r=A*x-zi
-
-flroot=meshname+flinname
-np.savetxt(flroot+"residual.txt",r)
+np.savetxt(flroot+".residual.txt",r)
 SP=np.sqrt(np.mean(r**2))
 print("Misfit RMS = "+str(SP) + "(m)")
 
-r=zi
-#np.savetxt(flroot+"residual.txt",r)
+r=zi-np.mean(zi)
 SP=np.sqrt(np.mean(r**2))
-print("Data RMS = "+str(SP) + "(m)")
+print("data RMS  = " + str(SP) + "(m)")
 
 r=R*(A*x-zi)
-#np.savetxt(flroot+"residualNormalized.txt",r)
+np.savetxt(flroot+".residual_normalized.txt",r)
 SP=np.sum(r**2)
-print("MisfitPenalty = "+str(SP))
+print("misfit penalty = "+str(SP))
 
 r=WDx*x
-#np.savetxt(flroot+"SmoothPenalty.txt",r)
+np.savetxt(flroot+".smoothness_penalty.txt",r)
 SP=gamma*np.sum(r**2)
-print("SmoothPenalty = "+str(SP))
+print("smoothness penalty = "+str(SP))
 
+################################################################
 #Apply local limits to solution:
 
-# MeshNodeInfo.rwps.oc_1500m_30km.SparseMatrix.rwps.oc_1500m_30km.GlobalDataPointsX.nc
 flinZlim="MeshNodeInfo."+meshname+flinname+".nc"
 data = nc.Dataset(flinZlim,"r")
 zmean=np.array(data["zmean"][:])
@@ -261,24 +248,10 @@ zmax[jbad]=zmaxGlobal
 
 j=np.where(np.isnan(zmean))[0].tolist()
 zmean[j]=z0[j]
+
+flroot="WithLim."+meshname+flinname
+
 x, info = cg(G, b, x0=zmean,rtol=10.**(-9))
-
-r=A*x-zi
-SP=np.sqrt(np.mean(r**2))
-print("NoLim Misfit RMS = "+str(SP) + "(m)")
-r=zi
-SP=np.sqrt(np.mean(r**2))
-print("NoLim Data RMS = "+str(SP) + "(m)")
-r=R*(A*x-zi)
-SP=np.sum(r**2)
-print("NoLim MisfitPenalty = "+str(SP))
-r=WDx*x
-SP=gamma*np.sum(r**2)
-print("NoLim SmoothPenalty = "+str(SP))
-
-flroot="NoLim."+meshname+flinname
-np.savetxt(flroot+"optbat.txt",x)
-
 
 jhigh=np.where(x>zmax)[0].tolist()
 jlow =np.where(x<zmin)[0].tolist()
@@ -286,16 +259,24 @@ jlow =np.where(x<zmin)[0].tolist()
 x[jhigh]=zmax[jhigh]
 x[jlow]=zmin[jlow]
 
-flroot="WithLim."+meshname+flinname
-np.savetxt(flroot+"optbat.txt",x)
+np.savetxt(flroot+".optbat.txt",x)
+
+r=A*x-zi
+np.savetxt(flroot+".residual.txt",r)
 SP=np.sqrt(np.mean(r**2))
-print("WithLim Misfit RMS = "+str(SP) + "(m)")
-r=zi
+print("Misfit RMS = "+str(SP) + "(m)")
+
+r=zi-np.mean(zi)
 SP=np.sqrt(np.mean(r**2))
-print("WithLim Data RMS = "+str(SP) + "(m)")
+print("data RMS  = " + str(SP) + "(m)")
+
 r=R*(A*x-zi)
+np.savetxt(flroot+".residual_normalized.txt",r)
 SP=np.sum(r**2)
-print("WithLim MisfitPenalty = "+str(SP))
+print("misfit penalty = "+str(SP))
+
 r=WDx*x
+np.savetxt(flroot+".smoothness_penalty.txt",r)
 SP=gamma*np.sum(r**2)
-print("WithLim SmoothPenalty = "+str(SP))
+print("smoothness penalty = "+str(SP))
+
