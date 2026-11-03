@@ -158,8 +158,6 @@ meshslash=mshfl.rfind('/')+1
 meshname=mshfl[meshslash:-3]
 flinname=flin[flinslash:-3]
 
-flout=flin[0 : -3]+".weights."+meshname+flinname+".nc"
-
 # read in Sparse matrix information
 flinSM="SparseMatrix."+meshname+flinname+".nc"
 data = nc.Dataset(flinSM,"r")

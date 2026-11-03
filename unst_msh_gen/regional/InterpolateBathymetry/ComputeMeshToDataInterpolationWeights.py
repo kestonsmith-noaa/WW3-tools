@@ -280,7 +280,7 @@ def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs, nobs): #, ComputeNodes)
 
         if nobs > 400*10^6:
             f.write("#SBATCH --mem=64G \n") 
-        if nobs > 200*10^6:
+        elif nobs > 200*10^6:
             f.write("#SBATCH --mem=32G \n")
         elif nobs > 100*10^6:
             f.write("#SBATCH --mem=16G \n") 
@@ -288,8 +288,8 @@ def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs, nobs): #, ComputeNodes)
             f.write("#SBATCH --mem=8G \n") 
         elif nobs > 25*10^6:
             f.write("#SBATCH --mem=4G \n") 
-
-        f.write("#SBATCH --mem=16G \n") # EACH of the 100 tasks gets 4 GB of RAM
+        else :
+            f.write(" \n") 
 
         f.write(" \n")
         f.write("source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate \n")
