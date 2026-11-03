@@ -153,11 +153,10 @@ mshfl=sys.argv[2]
 x, y, z, e, bnd=FE.loadWW3Mesh(mshfl)
 
 nn=len(x)
-
 flinslash=flin.rfind('/')+1
 meshslash=mshfl.rfind('/')+1
 meshname=mshfl[meshslash:-3]
-flinname=flin[flinslash:-2]
+flinname=flin[flinslash:-3]
 
 flout=flin[0 : -3]+".weights."+meshname+flinname+".nc"
 

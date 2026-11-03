@@ -257,11 +257,12 @@ def compute_mesh_to_point_interp_weights_element_loop_zlim(x, y, e, xi, yi, zi):
 
 # write job array to jobcard
 def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs, nobs): #, ComputeNodes):
-    flinslash=flin.rfind('/')+1
-    flinname=flin[flinslash:len(mshfl)-2]
-    meshslash=mshfl.rfind('/')+1
-    meshname=mshfl[meshslash:len(mshfl)-3]
     
+    flinslash=flin.rfind('/')+1
+    meshslash=mshfl.rfind('/')+1
+    meshname=mshfl[meshslash:-3]
+    flinname=flin[flinslash:-3]
+   
     TmpOutDir="InterpWeights."+meshname+"."+flinname
     
     with open(jobfl, 'w') as f:
@@ -306,8 +307,9 @@ mshfl=sys.argv[2]
 
 flinslash=flin.rfind('/')+1
 meshslash=mshfl.rfind('/')+1
-meshname=mshfl[meshslash : -3]
-flinname=flin[flinslash : -2 ]
+meshname=mshfl[meshslash:-3]
+flinname=flin[flinslash:-3]
+
 TmpOutDir="InterpWeights."+meshname+flinname
 
 #if nargin==3 then write the parallel jobcard that carries out the interpolation weight calculation

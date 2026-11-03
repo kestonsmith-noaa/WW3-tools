@@ -30,9 +30,10 @@ mshfl=sys.argv[2]
 
 flinslash=flin.rfind('/')+1
 meshslash=mshfl.rfind('/')+1
-meshname=mshfl[meshslash:len(mshfl)-3]
+meshname=mshfl[meshslash:-3]
+flinname=flin[flinslash:-3]
 
-TmpOutDir="InterpWeights."+meshname+flin[flinslash:len(flin)-3]
+TmpOutDir="InterpWeights."+meshname+flinname
 print(TmpOutDir)
 Njobs=int(sys.argv[3])
 AllData=arr = np.zeros((1, 12))
