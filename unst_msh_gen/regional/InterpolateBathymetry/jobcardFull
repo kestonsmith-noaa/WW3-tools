@@ -27,7 +27,7 @@ python -u ComputeMeshToDataInterpolationWeights.py $datafile $meshfile $N
 
 sbatch --wait jobcardComputeMeshToObsInterpWeightsSLURM
 
-python -u convert_weights_to_netcdf.py $datafile $meshfile $N >convert_weights_to_netcdf.out
+python -u convert_weights_to_netcdf.py $datafile $meshfile $N > convert_weights_to_netcdf.out
 
-python -u MinimizeQuadForm.py  $datafile $meshfile $N > MinimizeQuadForm.out
+python -u MinimizeQuadForm.py  $datafile $meshfile > MinimizeQuadForm.out
 
