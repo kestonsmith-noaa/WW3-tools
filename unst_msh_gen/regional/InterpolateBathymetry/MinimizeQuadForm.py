@@ -157,9 +157,7 @@ nn=len(x)
 flinslash=flin.rfind('/')+1
 meshslash=mshfl.rfind('/')+1
 meshname=mshfl[meshslash:-3]
-flinname=flin[flinslash:-2]
-
-flout=flin[0 : -3]+".weights."+meshname+flinname+".nc"
+flinname=flin[flinslash:-3]
 
 # read in Sparse matrix information
 flinSM="SparseMatrix."+meshname+flinname+".nc"

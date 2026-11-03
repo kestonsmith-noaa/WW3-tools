@@ -258,9 +258,9 @@ def compute_mesh_to_point_interp_weights_element_loop_zlim(x, y, e, xi, yi, zi):
 # write job array to jobcard
 def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs, nobs): #, ComputeNodes):
     flinslash=flin.rfind('/')+1
-    flinname=flin[flinslash:len(mshfl)-2]
+    flinname=flin[flinslash : -2]
     meshslash=mshfl.rfind('/')+1
-    meshname=mshfl[meshslash:len(mshfl)-3]
+    meshname=mshfl[meshslash : -3]
     
     TmpOutDir="InterpWeights."+meshname+"."+flinname
     
@@ -279,7 +279,7 @@ def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs, nobs): #, ComputeNodes)
 
         if nobs > 400*10^6:
             f.write("#SBATCH --mem=64G \n") 
-        if nobs > 200*10^6:
+        elif nobs > 200*10^6:
             f.write("#SBATCH --mem=32G \n")
         elif nobs > 100*10^6:
             f.write("#SBATCH --mem=16G \n") 
@@ -287,8 +287,8 @@ def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs, nobs): #, ComputeNodes)
             f.write("#SBATCH --mem=8G \n") 
         elif nobs > 25*10^6:
             f.write("#SBATCH --mem=4G \n") 
-
-        f.write("#SBATCH --mem=16G \n") # EACH of the 100 tasks gets 4 GB of RAM
+        else :
+            f.write(" \n") 
 
         f.write(" \n")
         f.write("source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate \n")

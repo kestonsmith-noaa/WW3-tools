@@ -29,10 +29,11 @@ flin=sys.argv[1]
 mshfl=sys.argv[2]
 
 flinslash=flin.rfind('/')+1
+flinname=flin[flinslash:-3]
 meshslash=mshfl.rfind('/')+1
 meshname=mshfl[meshslash:len(mshfl)-3]
 
-TmpOutDir="InterpWeights."+meshname+flin[flinslash:len(flin)-3]
+TmpOutDir="InterpWeights."+meshname+flinname
 print(TmpOutDir)
 Njobs=int(sys.argv[3])
 AllData=arr = np.zeros((1, 12))
@@ -43,19 +44,14 @@ for k in range(Njobs):
     FoundElement=AllOutMatrix[:,10].astype(int)
     jg=np.where(FoundElement==1)
     jg=jg[0].tolist()
-#    if len(jg) > 0:
     AllData=np.vstack((AllData,AllOutMatrix[jg,:]))
 
 AllData=AllData[1 : ,:]
-#np.savetxt("AllData.txt", AllData, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
-#365042 -5528.000000 10.000000 3812 6516 8606 0.360925 0.471654 0.167421 7607 1 17.212554
 
-flout="InterpWeights."+meshname+flin[flinslash:len(flin)-3]+".nc"
+flout="InterpWeights."+meshname+flinname+".nc"
 
 N,twelve=AllData.shape
-#                                   0       1    2    [3,4,5] [6,7,8]   9       10               11
-#AllOutMatrix=np.column_stack( ( point_set, zi,  ei,   nodes, weights, elenum, FoundElement, Dist2EleCenter) )
-#np.savetxt(weights_file, AllOutMatrix, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
+
 with nc.Dataset(flout, 'w', format='NETCDF4') as ncout:
     ncout.createDimension('n' , N)
     ncout.createDimension('three' , 3)
@@ -96,7 +92,7 @@ nodes  =AllData[:,3 : 6]
 row = range(N)
 ROW = np.column_stack([row] * 3) 
 
-flout="SparseMatrix."+meshname+flin[flinslash:len(flin)-3]+".nc"
+flout="SparseMatrix."+meshname+flinname+".nc"
 
 nn_dst=N
 import FiniteElementMeshRoutines as FE
@@ -133,8 +129,7 @@ with nc.Dataset(flout, 'w', format='NETCDF4') as ncout:
 
     ncout.close
 
-# InterpWeights.rwps.oc_1500m_30km.GlobalDataPointsX/Part.zlim.1.txt
-
+# Search across parallel jobs to establish local observed min, max, and mean
 nn=len(x)
 
 Zmin=np.zeros(nn)+float('inf')
@@ -160,6 +155,7 @@ for k in range(Njobs):
     Nobs[nj0]=Nobs[nj0]+Nobs0
     
 
+
 #global limitors, applies for nodes with no observations in adjacent elements 
 ZmaxGlobal = +1.
 ZminGlobal = -11000.
@@ -169,20 +165,12 @@ jMissedMin=np.where(Zmin > ZmaxGlobal)[0].tolist()
 Zmax[jMissedMax]=ZmaxGlobal
 Zmin[jMissedMin]=ZminGlobal
 
-flinslash=flin.rfind('/')+1
-meshslash=mshfl.rfind('/')+1
-
-#floutZlim=mshfl[meshslash : -3]+flin[flinslash : -2] + "node.Zlim.txt"
-
 Zmean=np.divide(Zsum , Nobs.astype(float) )
 
 j=np.where(Nobs0==0)[0].tolist()
 Zmean[j]= 0. 
 
-#Zlim=np.column_stack( ( range(nn), Zmin, Zmax, Nobs, Zmean) )
-#np.savetxt(floutZlim, Zlim,  fmt='%d %e %e %d %e')
-
-flout="MeshNodeInfo."+meshname+flin[flinslash:len(flin)-3]+".nc"
+flout="MeshNodeInfo."+meshname+flinname+".nc"
 
 with nc.Dataset(flout, 'w', format='NETCDF4') as ncout:
     ncout.createDimension('n_nodes' , nn)
