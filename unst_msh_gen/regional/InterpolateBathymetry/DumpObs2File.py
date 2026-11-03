@@ -33,6 +33,9 @@ with open("DefineVariables.py", "r") as file:
     print(code)
     exec(code)
 
+GlobalZmin=-11000. # deepest - filter for mislabeled fill values
+MarineZmax=1. # exlude land points greater than MarineZmax above mean sea level
+
 xs=[]
 ys=[]
 zs=[]
@@ -57,14 +60,25 @@ for j in range(nf):
         z0 = Z0.flatten() 
     else :
         z0=data["z"][:]
-        
+
+# remove fill points, nans, land, mislabeled fill etc.        
     fillval0=data["z"]._FillValue
     jf=np.where( z0 != fillval0 )
     x0=np.array(x0[jf])
     y0=np.array(y0[jf])
     z0=np.array(z0[jf])
 
-    jf=np.where( z0**2 >= 0. )
+    jf=np.where( z0**2 >= 0. ) # remove non nan's
+    x0=np.array(x0[jf])
+    y0=np.array(y0[jf])
+    z0=np.array(z0[jf])
+    
+    jf=np.where( z0 > GlobalZmin ) # remove mislabeled fill values -99999 in some files
+    x0=np.array(x0[jf])
+    y0=np.array(y0[jf])
+    z0=np.array(z0[jf])
+    
+    jf=np.where( z0 <= MarineZmax ) # remove land points 
     x0=np.array(x0[jf])
     y0=np.array(y0[jf])
     z0=np.array(z0[jf])
@@ -81,7 +95,7 @@ if TextOutput :
     np.savetxt("AllBathyZ.txt" , zs, fmt="%.8e" )
     np.savetxt("AllBathyStd.txt" , es, fmt="%.8e" )
 else :    
-   with nc.Dataset("AllDataPoints.nc", 'w', format='NETCDF4') as ncout:
+   with nc.Dataset("AllMarineDataPoints.nc", 'w', format='NETCDF4') as ncout:
         n=len(zs)
         ncout.createDimension('N', n)  # Unlimited dimension
         

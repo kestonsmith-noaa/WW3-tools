@@ -133,152 +133,80 @@ with nc.Dataset(flout, 'w', format='NETCDF4') as ncout:
 
     ncout.close
 
-"""    
-    c_var=ncout.createVariable('col', 'i4', ('n_s',))
-    c_var.long_name     = 'column index'
-    c_var[:]=col[:]
+# InterpWeights.rwps.oc_1500m_30km.GlobalDataPointsX/Part.zlim.1.txt
+
+nn=len(x)
+
+Zmin=np.zeros(nn)+float('inf')
+Zmax=np.zeros(nn)-float('inf')
+Zsum=np.zeros(nn)
+Nobs=np.zeros(nn,dtype=int)
+
+for k in range(Njobs):
+    fl=TmpOutDir+"/Part.zlim."+str(k)+".txt"
+    print(fl)
+    AllOutMatrix=np.loadtxt(fl)
+    print(AllOutMatrix.shape)
+
+    nj0=AllOutMatrix[:,0].astype(int)
+    Zmin0=AllOutMatrix[:,1]
+    Zmax0=AllOutMatrix[:,2]
+    Nobs0=AllOutMatrix[:,3]
+    Zsum0=AllOutMatrix[:,4]
+
+    Zmin[nj0]=np.min(np.vstack( (Zmin[nj0],Zmin0) ), axis=0 )
+    Zmax[nj0]=np.max(np.vstack( (Zmax[nj0],Zmax0) ), axis=0 )
+    Zsum[nj0]=Zsum[nj0]+Zsum0
+    Nobs[nj0]=Nobs[nj0]+Nobs0
     
-    s_var=ncout.createVariable('S', 'f8', ('n_s',))
-    s_var.long_name     = 'matrix value'
-    s_var[:]=val[:]
-"""
 
-"""    
-    print(data_point_number)
-    new_points=AllOutMatrix[jg,0]
-    print(new_points)
-    new_points=new_points.astype(int)
-    print(data_point_number)    
-    print(new_points)
-    new_points=new_points.tolist
-    print(new_points)
-    data_point_number.extend(new_points)
-"""    
-"""
-#                                   0       1    2    [3,4,5] [6,7,8]   9       10               11
-#AllOutMatrix=np.column_stack( ( point_set, zi,  ei,   nodes, weights, elenum, FoundElement, Dist2EleCenter) )
-#np.savetxt(weights_file, AllOutMatrix, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
-408182 -4582.000000 10.000000 5805 5808 5804 0.163625 0.613954 0.222421 11620 1 70.732705
-408183 -3441.000000 10.000000 5805 5808 5804 0.259573 0.615523 0.124904 11620 1 76.439576
-408184 -4537.000000 10.000000 5805 5808 5804 0.355521 0.617092 0.027388 11620 1 92.139210
-408185 -4586.000000 10.000000 5806 5808 5805 0.075990 0.550091 0.373919 11624 1 71.793484
+#global limitors, applies for nodes with no observations in adjacent elements 
+ZmaxGlobal = +1.
+ZminGlobal = -11000.
+jMissedMax=np.where(Zmax < ZminGlobal)[0].tolist()
+jMissedMin=np.where(Zmin > ZmaxGlobal)[0].tolist()
 
-flout=TextWeightFl[0:len(TextWeightFl)-4]+".nc"
+Zmax[jMissedMax]=ZmaxGlobal
+Zmin[jMissedMin]=ZminGlobal
 
-xi, yi, ei, zi = iutil.loadWW3Mesh(mshfl)
-nn_dst=len(xi)
-data = nc.Dataset(flin,"r")
-#read spaital dimensions and determine if input mesh is curvilinear or regular
-x=np.asarray(data["x"][:])
-#convert to RWPS coordinates
+flinslash=flin.rfind('/')+1
+meshslash=mshfl.rfind('/')+1
 
-jEast=np.where(x>90)
-x[jEast]=x[jEast]-360.
+#floutZlim=mshfl[meshslash : -3]+flin[flinslash : -2] + "node.Zlim.txt"
 
-nn_src=len(x)
+Zmean=np.divide(Zsum , Nobs.astype(float) )
 
-#Read in weights from cat of text output(rows are not in order)
-F=np.loadtxt(TextWeightFl)
+j=np.where(Nobs0==0)[0].tolist()
+Zmean[j]= 0. 
 
-node_dst=F[:,0] # row number (destination node)
-ele_num_src=F[:,1] # Source element number (not used)
-node_src=F[:,2:5] # Source node
-DistToCenterKM=F[:,5] # distance of destination node from source element center (not used) 
-weights=F[:,6:9] # interpolation weights from source nodes to destination node
+#Zlim=np.column_stack( ( range(nn), Zmin, Zmax, Nobs, Zmean) )
+#np.savetxt(floutZlim, Zlim,  fmt='%d %e %e %d %e')
 
-node_dst=node_dst.astype(int)
-node_src=node_src.astype(int)
-ele_num_src=ele_num_src.astype(int)
-
-nnz=F.shape[0]
-n_s=3*nnz
-row=np.zeros(n_s,dtype=int)
-col=np.zeros(n_s,dtype=int)
-val=np.zeros(n_s)
-
-n=0
-for k in range(nnz):
-    for j in range(3):
-        row[n]=node_dst[k]
-        col[n]=node_src[k,j]
-        val[n]=weights[k,j]
-        n=n+1
-print("n="+str(n))
-print("n_s="+str(n_s))
-n_s=n
+flout="MeshNodeInfo."+meshname+flin[flinslash:len(flin)-3]+".nc"
 
 with nc.Dataset(flout, 'w', format='NETCDF4') as ncout:
-    ncout.createDimension('n_s' , n_s)
-    ncout.setncattr("Nrows", nn_dst)
-    ncout.setncattr("Ncols", nn_src)
+    ncout.createDimension('n_nodes' , nn)
+    ncout.setncattr("mesh file", mshfl)
+    ncout.setncattr("data file", flin)
+    ncout.setncattr("imposed global z maximum",ZmaxGlobal)
+    ncout.setncattr("imposed global z minimum",ZminGlobal)
+    ncout.setncattr("data file", flin)
     ncout.setncattr("SrcFieldType", "unstructured") 
     
-    r_var=ncout.createVariable('row', 'i4', ('n_s',))
-    r_var.long_name     = 'row index'
-    r_var[:]=row[:]
+    n_var=ncout.createVariable('nobs', 'i8', ('n_nodes',))
+    n_var.long_name     = 'number of observations in adjacent elements'
+    n_var[:]=Nobs[:]
+
+    zmax_var=ncout.createVariable('zmax', 'f8', ('n_nodes',))
+    zmax_var.long_name     = 'maximum observation value in adacent elements'
+    zmax_var[:]=Zmax[:]
+
+    zmin_var=ncout.createVariable('zmin', 'f8', ('n_nodes',))
+    zmin_var.long_name     = 'minimum observation value in adacent elements'
+    zmin_var[:]=Zmin[:]
     
-    c_var=ncout.createVariable('col', 'i4', ('n_s',))
-    c_var.long_name     = 'column index'
-    c_var[:]=col[:]
-    
-    s_var=ncout.createVariable('S', 'f8', ('n_s',))
-    s_var.long_name     = 'matrix value'
-    s_var[:]=val[:]
+    zmean_var=ncout.createVariable('zmean', 'f8', ('n_nodes',))
+    zmean_var.long_name     = 'mean observation value over adacent elements'
+    zmean_var[:]=Zmean[:]
 
-#Consider adding (x,y) destination and (x,y) for source. This is usefull for extrapolation
-    if AddExtrapolationSupport:
-        x=np.asarray(data["x"][:])
-        y=np.asarray(data["y"][:])
-        ncout.createDimension('nn_src' , nn_src)
-        ncout.createDimension('nn_dst' , nn_dst)
-        
-        xsrc_var=ncout.createVariable('x_src', 'f8', ('nn_src',))
-        xsrc_var.long_name     = 'interpolation source node longitude'
-        xsrc_var[:]=x[:]
-        
-        ysrc_var=ncout.createVariable('y_src', 'f8', ('nn_src',))
-        ysrc_var.long_name     = 'interpolation source node latitude'
-        ysrc_var[:]=y[:]
-        
-        xdst_var=ncout.createVariable('x_dst', 'f8', ('nn_dst',))
-        xdst_var.long_name     = 'interpolation destination node longitude'
-        xdst_var[:]=xi[:]
-    
-        ydst_var=ncout.createVariable('y_dst', 'f8', ('nn_dst',))
-        ydst_var.long_name     = 'interpolation destination node latitude'
-        ydst_var[:]=yi[:]
-
-        zdst_var=ncout.createVariable('depth_dst', 'f8', ('nn_dst',))
-        zdst_var.long_name     = 'interpolation destination node latitude'
-        zdst_var[:]=zi[:]
-
-Extrapolate=sys.argv[4]
-
-if Extrapolate:
-    dist2bnd=np.full(len(xi), np.inf) #all points are inside boundary- No boundary with this type of extrapolation
-else:
-    matrix = sp.coo_matrix((weights, (row-1, col-1)), shape=(nn_src,nn_dst)).tocsr()
-    row_sum = matrix.sum(axis=1)
-    j0=np.where( row_sum==0 ) # destination nodes with no coverage from interpolation matrix
-    j0=np.array(j0[0]).tolist()
-    u0=np.ones(xi.shape)
-    nan=float("nan")
-    u0[j0]=nan
-    dist2bnd=iutil.CalculateDistanceToInterpEnvelope(xi,yi,u0, 1.)
-
-dist2bnd_file = "DistToBndy."+mshfl[meshslash:len(mshfl)-4]+".stofs.nc"
-with nc.Dataset(dist2bnd_file, 'w', format='NETCDF4') as ncout:
-    ncout.createDimension('node' , nn_dst)
-    d_var=ncout.createVariable('dist2bnd', 'f4', ('node',))
-    d_var.long_name     = 'distance to boundary'
-    d_var.units         = 'km'
-    d_var.standard_name = 'distance to boundary'
-    d_var[:]=dist2bnd[:]
-    
-    z_var=ncout.createVariable('depth', 'f4', ('node',))
-    z_var.long_name     = 'mesh depth'
-    z_var.units         = 'm'
-    z_var.standard_name = 'depth'
-    z_var[:]=zi[:]
-
-"""
+    ncout.close

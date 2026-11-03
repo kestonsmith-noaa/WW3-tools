@@ -21,7 +21,7 @@ module purge
 source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate 
 
 pip list 
-
+# create parallel job card to calculate Mesh to Obs linear operator
 python ComputeMeshToDataInterpolationWeights.py $datafile $meshfile $N
 
 sbatch --wait jobcardComputeMeshToObsInterpWeightsSLURM

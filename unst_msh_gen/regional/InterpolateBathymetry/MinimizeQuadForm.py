@@ -160,8 +160,8 @@ meshname=mshfl[meshslash:len(mshfl)-3]
 flout=flin[0 : -3]+".weights."+meshname[0 : -3 ]+".nc"
 
 # read in Sparse matrix information
-flin="SparseMatrix."+meshname+flin[flinslash:len(flin)-3]+".nc"
-data = nc.Dataset(flin,"r")
+flinSM="SparseMatrix."+meshname+flin[flinslash:len(flin)-3]+".nc"
+data = nc.Dataset(flinSM,"r")
 Nrows = getattr(data, "Nrows")
 Ncols = getattr(data, "Ncols")
 row=np.array(data["row"][:])
@@ -207,9 +207,8 @@ gamma=1000. # grad in meters
 gamma=100. # grad in meters
 gamma=10. # grad in meters
 
-gamma=.1*Nobs/Nnodes
-
-
+gamma=.1*float(Nobs)/float(Nnodes)
+gamma=1.*float(Nobs)/float(Nnodes)
 
 AR = R * A
 Rz = R * zi
@@ -220,25 +219,91 @@ z0=-z;
 jup=np.where(z0>0.)
 z0[jup]=0.
 
+flinslash=flin.rfind('/')+1
+flinname=flin[flinslash:len(mshfl)-2]
+#flin="SparseMatrix."+meshname+flin[flinslash:len(flin)-3]+".nc"
+
+flroot=meshname+flinname
+
 x, info = cg(G, b, x0=z0)
-np.savetxt(meshname+"optbat.txt",x)
+#x, info = cg(G, b, x0=z0,rtol=10.**(-9))
+np.savetxt(flroot+"optbat.txt",x)
 
 r=A*x-zi
-np.savetxt(meshname+"residual.txt",r)
+#np.savetxt(flroot+"residual.txt",r)
 SP=np.sqrt(np.mean(r**2))
 print("Misfit RMS = "+str(SP) + "(m)")
 
 r=zi
-np.savetxt(meshname+"residual.txt",r)
+#np.savetxt(flroot+"residual.txt",r)
 SP=np.sqrt(np.mean(r**2))
 print("Data RMS = "+str(SP) + "(m)")
 
 r=R*(A*x-zi)
-np.savetxt(meshname+"residualNormalized.txt",r)
+#np.savetxt(flroot+"residualNormalized.txt",r)
 SP=np.sum(r**2)
 print("MisfitPenalty = "+str(SP))
 
 r=WDx*x
-np.savetxt(meshname+"SmoothPenalty.txt",r)
+#np.savetxt(flroot+"SmoothPenalty.txt",r)
 SP=gamma*np.sum(r**2)
 print("SmoothPenalty = "+str(SP))
+
+#Apply local limits to solution:
+
+flinslash=flin.rfind('/')+1
+meshslash=mshfl.rfind('/')+1
+
+# MeshNodeInfo.rwps.oc_1500m_30km.SparseMatrix.rwps.oc_1500m_30km.GlobalDataPointsX.nc
+flinZlim="MeshNodeInfo."+meshname+flin[flinslash:len(flin)-3]+".nc"
+data = nc.Dataset(flinZlim,"r")
+zmean=np.array(data["zmean"][:])
+zmin=np.array(data["zmin"][:])
+zmax=np.array(data["zmax"][:])
+
+jbad=np.where(zmin>zmax)[0].tolist()
+zminGlobal=-11000.
+zmaxGlobal= 1.
+zmin[jbad]=zminGlobal
+zmax[jbad]=zmaxGlobal
+
+j=np.where(np.isnan(zmean))[0].tolist()
+zmean[j]=z0[j]
+x, info = cg(G, b, x0=zmean,rtol=10.**(-9))
+
+r=A*x-zi
+SP=np.sqrt(np.mean(r**2))
+print("NoLim Misfit RMS = "+str(SP) + "(m)")
+r=zi
+SP=np.sqrt(np.mean(r**2))
+print("NoLim Data RMS = "+str(SP) + "(m)")
+r=R*(A*x-zi)
+SP=np.sum(r**2)
+print("NoLim MisfitPenalty = "+str(SP))
+r=WDx*x
+SP=gamma*np.sum(r**2)
+print("NoLim SmoothPenalty = "+str(SP))
+
+flroot="NoLim."+meshname+flinname
+np.savetxt(flroot+"optbat.txt",x)
+
+
+jhigh=np.where(x>zmax)[0].tolist()
+jlow =np.where(x<zmin)[0].tolist()
+
+x[jhigh]=zmax[jhigh]
+x[jlow]=zmin[jlow]
+
+flroot="WithLim."+meshname+flinname
+np.savetxt(flroot+"optbat.txt",x)
+SP=np.sqrt(np.mean(r**2))
+print("WithLim Misfit RMS = "+str(SP) + "(m)")
+r=zi
+SP=np.sqrt(np.mean(r**2))
+print("WithLim Data RMS = "+str(SP) + "(m)")
+r=R*(A*x-zi)
+SP=np.sum(r**2)
+print("WithLim MisfitPenalty = "+str(SP))
+r=WDx*x
+SP=gamma*np.sum(r**2)
+print("WithLim SmoothPenalty = "+str(SP))

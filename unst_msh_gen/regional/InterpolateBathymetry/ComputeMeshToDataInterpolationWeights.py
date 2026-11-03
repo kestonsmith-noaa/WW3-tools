@@ -41,6 +41,7 @@ def lenX(obj):
     if isinstance(obj, (int, float, complex)):
         return 1
 
+#add element max_obs, min_obs to keep interpolator concave
 def compute_mesh_to_point_interp_weights_element_loop(x, y, e, xi, yi):
     
     # Convert to numpy arrays
@@ -139,8 +140,123 @@ def compute_mesh_to_point_interp_weights_element_loop(x, y, e, xi, yi):
     return weights, nodes, elenum, Dist2EleCenter, FoundElement
 
 
+def compute_mesh_to_point_interp_weights_element_loop_zlim(x, y, e, xi, yi, zi):
+    
+    # Convert to numpy arrays
+    from itertools import chain
+    deg2kmY=111.
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+    e = np.asarray(e)
+    xi = np.asarray(xi)
+    yi = np.asarray(yi)
+    zi = np.asarray(zi)
+    
+    nn=len(x)
+    Zmax=np.zeros(nn)-float('inf')
+    Zmin=np.zeros(nn)+float('inf')
+    ZObsSum=np.zeros(nn)
+    ObsCount=np.zeros(nn,dtype=int)
+    
+    # convert node indexs to 0 .. nn-1
+    e0=e-1
+    xc = np.mean(x[e0], axis=1)
+    yc = np.mean(y[e0], axis=1)
+    
+    lleps=10.**-8
+    print("lleps="+str(lleps))
+    
+    xmin = np.min(x[e0], axis=1)- lleps
+    ymin = np.min(y[e0], axis=1)- lleps
+    xmax = np.max(x[e0], axis=1)+ lleps
+    ymax = np.max(y[e0], axis=1)+ lleps
+    # Initialize output arrays
+    n_points = len(xi)
+    n_elements = len(e)
+    weights = np.zeros((n_points, 3)) -99999.
+    nodes = np.zeros((n_points, 3), dtype=int) -99999
+    elenum = np.zeros(n_points, dtype=int) -99999
+    Dist2EleCenter = np.zeros(n_points) -99999.
+
+    FoundElement=np.zeros(n_points, dtype=int)
+    
+    PC=np.vstack((xc,yc)).T
+    PI=np.vstack((xi,yi)).T
+    print(PC.shape)
+    print(PI.shape)
+    tree = cKDTree(PI)
+    ne=len(xmin)
+    jnf=range(n_points) # j not found
+    for k in range(ne):
+        xl=x[e0[k,:]]
+        yl=y[e0[k,:]]
+        rx=np.max( np.abs([xl-xc[k]]) )
+        ry=np.max( np.abs([yl-yc[k]]) )
+        r_cutoff=np.sqrt(rx**2+ry**2)
+        ji = tree.query_ball_point(PC[k,:], r=r_cutoff, workers=-1)
+        nji=lenX(ji)
+        if nji>0:
+            IsIn=IsInElementV(xl,yl,xi[ji],yi[ji])
+            npf=sum(IsIn)
+            if npf > 0 :
+                jfound=np.zeros(npf,dtype=int)
+                n=0
+                for kk in range(nji):
+                    if IsIn[kk]==1:
+                        jfound[n]=ji[kk]
+                        n=n+1
+                FoundElement[jfound]=1
+                elenum[jfound] = k
+                nodes[jfound,:] = np.ones((npf,1),dtype=np.int32)*e[k,:]
+                
+                xil=xi[jfound]
+                yil=yi[jfound]
+
+                deg2kmX=np.cos( np.pi * yc[k] / 180.)*deg2kmY
+                distances = np.abs( deg2kmX*(xil - xc[k]) + 1j*deg2kmY*(yil - yc[k]))
+                Dist2EleCenter[jfound]=distances
+                
+                for j in range(len(jfound)):
+                    # Compute barycentric coordinates using shoelace formula for areas
+                    # Area of triangle formed by vertices 1, 2, and point (a3)
+                    x0=xil[j]
+                    y0=yil[j]
+                    xt = np.array([xl[0], xl[1], x0, xl[0]])
+                    yt = np.array([yl[0], yl[1], y0, yl[0]])
+                    a3 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+                    # Area of triangle formed by vertices 3, 1, and point (a2)
+                    xt = np.array([xl[2], xl[0], x0, xl[2]])
+                    yt = np.array([yl[2], yl[0], y0, yl[2]])
+                    a2 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+                    # Area of triangle formed by point, vertices 2, 3 (a1)
+                    xt = np.array([x0, xl[1], xl[2], x0])
+                    yt = np.array([y0, yl[1], yl[2], y0])
+                    a1 = -np.dot(xt[1:4] - xt[0:3], yt[0:3] + yt[1:4]) / 2
+
+                    # Normalize to get barycentric weights
+                    total_area = a1 + a2 + a3
+                    weights[jfound[j], :] = [a1, a2, a3] / total_area
+                #Find Zmax and Zmin for each node's neighborhood
+                for kk in range(3):
+                    n=e0[k,kk]
+                    Zmax[n]=max( Zmax[n], np.max(zi[jfound]) )
+                    Zmin[n]=min( Zmin[n], np.min(zi[jfound]) )
+                    ObsCount[n] =ObsCount[n]+len(jfound)
+                    ZObsSum[n]  =ZObsSum[n]+np.sum(zi[jfound])
+                        
+                
+
+        if k % 1000 == 0:
+            print(f"Progress: {k}/{ne}")
+            print("search elements : "+ str(k)+" / "+str(ne) +" searched")
+            print("observation points : "+str(np.sum(FoundElement))+" / " +str(len(FoundElement)) + " found"  )
+    
+    return weights, nodes, elenum, Dist2EleCenter, FoundElement, Zmin, Zmax, ZObsSum, ObsCount
+
+
 # write job array to jobcard
-def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs): #, ComputeNodes):
+def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs, nobs): #, ComputeNodes):
     flinslash=flin.rfind('/')+1
     meshslash=mshfl.rfind('/')+1
     meshname=mshfl[meshslash:len(mshfl)-3]
@@ -158,6 +274,19 @@ def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs): #, ComputeNodes):
        # f.write("#SBATCH --nodes="+str(ComputeNodes)+" \n")
         f.write("#SBATCH --ntasks-per-core=1"+" \n")
         f.write("#SBATCH --array=0-"+str(Njobs-1)+" \n")
+                # memory required per task - mostly dependnt on number of obeservations
+
+        if nobs > 400*10^6:
+            f.write("#SBATCH --mem=64G \n") 
+        if nobs > 200*10^6:
+            f.write("#SBATCH --mem=32G \n")
+        elif nobs > 100*10^6:
+            f.write("#SBATCH --mem=16G \n") 
+        elif nobs > 50*10^6:
+            f.write("#SBATCH --mem=8G \n") 
+        elif nobs > 25*10^6:
+            f.write("#SBATCH --mem=4G \n") 
+
         f.write("#SBATCH --mem=16G \n") # EACH of the 100 tasks gets 4 GB of RAM
 
         f.write(" \n")
@@ -176,8 +305,9 @@ mshfl=sys.argv[2]
 
 flinslash=flin.rfind('/')+1
 meshslash=mshfl.rfind('/')+1
-meshname=mshfl[meshslash:len(mshfl)-3]
-TmpOutDir="InterpWeights."+meshname+flin[flinslash:len(flin)-3]
+meshname=mshfl[meshslash : -3]
+flinname=flin[flinslash : -2 ]
+TmpOutDir="InterpWeights."+meshname+flinname
 
 #if nargin==3 then write the parallel jobcard that carries out the interpolation weight calculation
 if nargin ==3 :
@@ -187,7 +317,10 @@ if nargin ==3 :
         os.remove(TmpOutDir+"/*.txt")
     except:
         print("directory "+TmpOutDir+" is alread empty")
-    WriteInterpJobscriptSLURM("jobcardComputeMeshToObsInterpWeightsSLURM",flin,mshfl,Njobs)
+    data = nc.Dataset(flin,"r")
+    xi=np.asarray(data["lon"][:])
+    nobs=len(xi)
+    WriteInterpJobscriptSLURM("jobcardComputeMeshToObsInterpWeightsSLURM",flin,mshfl,Njobs, nobs)
     print("Made parallel jobcards to create interpolation weights with "+str(Njobs)+" processes. Next step:")
     print("sbatch jobcardcompute_unstr_to_rwps_interp_weightsSLURM")
     sys.exit()
@@ -291,13 +424,39 @@ jxU=np.where( xmin < np.max(xwin)+SearchWidth )[0].tolist()
 jxD=np.where( xmax > np.min(xwin)-SearchWidth )[0].tolist()
 je=list( set(jxU) & set(jxD) )
 
-weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_point_interp_weights_element_loop(x, y, e[je,:], xi, yi)
-
+#weights, nodes, elenum, Dist2EleCenter, FoundElement=compute_mesh_to_point_interp_weights_element_loop(x, y, e[je,:], xi, yi)
+weights, nodes, elenum, Dist2EleCenter, FoundElement, Zmin, Zmax, ZObsSum, ObsCount = (
+    compute_mesh_to_point_interp_weights_element_loop_zlim(x, y, e[je,:], xi, yi,zi)
+    )
 #recover global element number after localization
 jg=np.where(elenum > -1)[0].tolist()
 je=np.array(je)
 elenum[jg]=je[elenum[jg]]
 
 AllOutMatrix=np.column_stack( ( point_set, zi, ei, nodes, weights, elenum, FoundElement, Dist2EleCenter) )
-np.savetxt(weights_file, AllOutMatrix, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
+#np.savetxt(weights_file, AllOutMatrix, fmt='%d %f %f %d %d %d %.6f %.6f %.6f %d %d %f')
+np.savetxt(weights_file, AllOutMatrix, fmt='%d %e %f %d %d %d %e %e %e %d %d %e')
+
+zlim_file = TmpOutDir+"/Part.zlim."+str(jobID)+".txt"
+#jg_lim=np.where( Zmax**2 + Zmin**2 <float('inf')  )[0].tolist()   
+jg_lim=np.where( ObsCount > 0 )[0].tolist()   
+
+Zmin=Zmin[jg_lim]
+Zmax=Zmax[jg_lim]
+ObsCount=ObsCount[jg_lim]
+ZObsSum=ZObsSum[jg_lim]
+jg_lim=np.asarray(jg_lim)
+
+print(Zmin.shape)
+print(Zmax.shape)
+print(ObsCount.shape)
+print(ZObsSum.shape)
+print(jg_lim.shape)
+
+zlimMatrix=np.column_stack( ( jg_lim, Zmin, Zmax, ObsCount, ZObsSum) )
+
+np.savetxt(zlim_file, zlimMatrix, fmt='%d %e %e %d %e')
+
+#zlimMatrix=np.column_stack( ( jg_lim, Zmin, Zmax ) )
+#np.savetxt(zlim_file, zlimMatrix, fmt='%d %.6f %.6f')
 
