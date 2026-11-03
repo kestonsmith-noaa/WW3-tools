@@ -1,20 +1,65 @@
 These are subroutines to interpolate bathymetry data to a unstructured
-meshes with triangular elements.  The interpolation uses Gauss Markov 
+meshes with triangular elements.  The program is intended to allow resolution
+of bathymetric features where the unstructured mesh has high resolution while
+appropriately representing bathymetric averages where the mesh is too coarse
+to represent small scale variation.  Two approaches to this problem are
+implemented here :
+
+In the first approach, the interpolation uses Gauss Markov
 smoothing with variable lengthscale proportional to the mesh lengthscale.
-The interpolation is computed in parallel across a user determined 
-number of mesh divisions.  The program uses an arbitrary number of 
-bathymetry data files.  It was designed to use a low resolution file 
+The interpolation is computed in parallel across a user determined
+number of mesh divisions.  Each node is interpolated to individually and
+intepedently with localized data taken from across specified data.
+The program uses an arbitrary number of bathymetry data files and it is
+assumed that observational variance differs between the data sets.
+As configured, the software uses a low resolution file
 with global coverage as well as local high resolution gridded bathymetry,
 and global scattered high resolution bathymetry data, such as global
-Satellite Derived Bathymetry (SDB). Bathymetry data sets need to be 
-downloaded and preprocessed to use a common format. The software is not 
-optimized for speed.
+Satellite Derived Bathymetry (SDB). Bathymetry data sets need to be
+downloaded and preprocessed to use a common format. Beware, this software
+is not optimized for speed!
+
+The second approach to bathymetric interpolation frames the problem as a
+quadratic form minimization. Under the constraint of mesh geometry we want the
+representation which best fits the obervations. Let
+
+Zmodel = arg min g(f) with
+
+g(f) = (A f - Zobs)^T (R^-1) (A f - Zobs) + gamma < (d f / dx )^2 + (d f / dy )^2 >
+
+where :
+    zobs    are the bathymetry observations (positive up ie. above mean sealevel )
+
+    Zmodel  is the unkown mesh bathymetry (f, in the quadratic form)
+
+    A       is the linear spatial interpolation matrix from the mesh nodes to the observed bathymetry points
+
+    R       is the observation error covariance matrix.  R is presumed non-constant diagonal,
+            with variance differing between bathymetric data sets.
+
+    < >     represents the spatial integral across the mesh / model domain.
+
+    gamma   is a dimensionless constant that controlls the smoothness of the interpolated bathymetry by
+            penalizing the square of the model bathymetric slope (TVD penalty). Higher gamma yields smoother bathymetry.
+            If there is broad enough data coverage, gamma=0 removes the smoothness constraint.
+
+The computational burden as the code as currently configured lies in the computing of the
+interpolation matrix A, so this step is split up over a large number of parallel tasks.
+The parallelism is designed for a SLURM computing environment with individual jobs run as an array.
+
+The software was motivated by the development of the Regional Wave Prediction System (RWPS).
+Here some important regions require blending SDB with low resolution global database.  In regions
+where high resolution gridded bathymetry is available, this is prioritized, however data points
+from all databases are included if they are near the point interpolated to. This is intended
+to prevent discontinuities at the boundary of data sets.
+
 
 The software was motivated by the development of the Regional Wave Prediction System (RWPS).
 Here some important regions require blending SDB with low resolution global database.  In regions
 where high resolution gridded bathymetry is available, this is prioritized, however data points 
 from all databases are included if they are near the point interpolated to. This is intended
-to prevent discontinuities at the boundary of data sets. 
+to prevent discontinuities at the boundary of data sets.  Two approaches to this problem are
+implemented here :
 
 
 To interpolate bathymetry to a mesh:
