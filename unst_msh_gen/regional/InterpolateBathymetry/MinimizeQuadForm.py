@@ -156,11 +156,13 @@ nn=len(x)
 
 flinslash=flin.rfind('/')+1
 meshslash=mshfl.rfind('/')+1
-meshname=mshfl[meshslash:len(mshfl)-3]
-flout=flin[0 : -3]+".weights."+meshname[0 : -3 ]+".nc"
+meshname=mshfl[meshslash:-3]
+flinname=flin[flinslash:-2]
+
+flout=flin[0 : -3]+".weights."+meshname+flinname+".nc"
 
 # read in Sparse matrix information
-flinSM="SparseMatrix."+meshname+flin[flinslash:len(flin)-3]+".nc"
+flinSM="SparseMatrix."+meshname+flinname+".nc"
 data = nc.Dataset(flinSM,"r")
 Nrows = getattr(data, "Nrows")
 Ncols = getattr(data, "Ncols")
@@ -195,19 +197,10 @@ WDy=W*Dy
 M=np.transpose(WDx)*WDx + np.transpose(WDy)*WDy # squared slope penalty,spatial integral
 
 
+# scale penalty with number of observations
 Nobs=len(zi)
 Nnodes=len(x)
 
-gamma=10.**(-9)
-gamma=10.**(-2) # shows effect
-gamma=10.**(-3) # shows effect
-gamma=10.**(-4) # shows effect
-#gamma=10.**(-2) # shows effect
-gamma=1000. # grad in meters
-gamma=100. # grad in meters
-gamma=10. # grad in meters
-
-gamma=.1*float(Nobs)/float(Nnodes)
 gamma=1.*float(Nobs)/float(Nnodes)
 
 AR = R * A
@@ -219,10 +212,6 @@ z0=-z;
 jup=np.where(z0>0.)
 z0[jup]=0.
 
-flinslash=flin.rfind('/')+1
-flinname=flin[flinslash:len(mshfl)-2]
-#flin="SparseMatrix."+meshname+flin[flinslash:len(flin)-3]+".nc"
-
 flroot=meshname+flinname
 
 x, info = cg(G, b, x0=z0)
@@ -231,6 +220,15 @@ np.savetxt(flroot+"optbat.txt",x)
 
 r=A*x-zi
 #np.savetxt(flroot+"residual.txt",r)
+#x, info = cg(G, b, x0=z0)
+
+x, info = cg(G, b, x0=z0, rtol=10.**(-9))
+np.savetxt(meshname+"optbat.txt",x)
+
+r=A*x-zi
+
+flroot=meshname+flinname
+np.savetxt(flroot+"residual.txt",r)
 SP=np.sqrt(np.mean(r**2))
 print("Misfit RMS = "+str(SP) + "(m)")
 
@@ -251,11 +249,8 @@ print("SmoothPenalty = "+str(SP))
 
 #Apply local limits to solution:
 
-flinslash=flin.rfind('/')+1
-meshslash=mshfl.rfind('/')+1
-
 # MeshNodeInfo.rwps.oc_1500m_30km.SparseMatrix.rwps.oc_1500m_30km.GlobalDataPointsX.nc
-flinZlim="MeshNodeInfo."+meshname+flin[flinslash:len(flin)-3]+".nc"
+flinZlim="MeshNodeInfo."+meshname+flinname+".nc"
 data = nc.Dataset(flinZlim,"r")
 zmean=np.array(data["zmean"][:])
 zmin=np.array(data["zmin"][:])

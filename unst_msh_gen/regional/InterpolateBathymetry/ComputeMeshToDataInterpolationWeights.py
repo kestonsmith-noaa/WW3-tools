@@ -258,11 +258,12 @@ def compute_mesh_to_point_interp_weights_element_loop_zlim(x, y, e, xi, yi, zi):
 # write job array to jobcard
 def WriteInterpJobscriptSLURM(jobfl, flin, mshfl, Njobs, nobs): #, ComputeNodes):
     flinslash=flin.rfind('/')+1
+    flinname=flin[flinslash:len(mshfl)-2]
     meshslash=mshfl.rfind('/')+1
     meshname=mshfl[meshslash:len(mshfl)-3]
-    TmpOutDir="InterpWeights."+meshname+"."+flin[flinslash:len(flin)-3]
-    meshslash=mshfl.rfind('/')+1
-    meshname=mshfl[meshslash:len(mshfl)-3]
+    
+    TmpOutDir="InterpWeights."+meshname+"."+flinname
+    
     with open(jobfl, 'w') as f:
         f.write("#!/bin/bash \n")
         f.write("#SBATCH --job-name=FindInterpWeightsMasterscript \n")
