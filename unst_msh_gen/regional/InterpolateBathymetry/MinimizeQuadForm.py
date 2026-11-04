@@ -212,8 +212,10 @@ flroot=meshname+flinname
 x, info = cg(G, b, x0=z0, rtol=10.**(-9))
 np.savetxt(flroot+".optbat.txt",x)
 
+output_residual=False
 r=A*x-zi
-np.savetxt(flroot+".residual.txt",r)
+if output_residual:
+    np.savetxt(flroot+".residual.txt",r, fmt="%.6e")
 SP=np.sqrt(np.mean(r**2))
 print("Misfit RMS = "+str(SP) + "(m)")
 
@@ -222,7 +224,8 @@ SP=np.sqrt(np.mean(r**2))
 print("data RMS  = " + str(SP) + "(m)")
 
 r=R*(A*x-zi)
-np.savetxt(flroot+".residual_normalized.txt",r)
+if output_residual:
+    np.savetxt(flroot+".residual_normalized.txt",r, fmt="%.6e")
 SP=np.sum(r**2)
 print("misfit penalty = "+str(SP))
 
@@ -251,7 +254,10 @@ zmean[j]=z0[j]
 
 flroot="WithLim."+meshname+flinname
 
-x, info = cg(G, b, x0=zmean,rtol=10.**(-9))
+#x, info = cg(G, b, x0=zmean,rtol=10.**(-9))
+x, info = cg(G, b, x0=z0,rtol=10.**(-9))
+print("CG info:")
+print(info)
 
 jhigh=np.where(x>zmax)[0].tolist()
 jlow =np.where(x<zmin)[0].tolist()
@@ -262,7 +268,8 @@ x[jlow]=zmin[jlow]
 np.savetxt(flroot+".optbat.txt",x)
 
 r=A*x-zi
-np.savetxt(flroot+".residual.txt",r)
+if output_residual:
+    np.savetxt(flroot+".residual.txt",r, fmt="%.6e")
 SP=np.sqrt(np.mean(r**2))
 print("Misfit RMS = "+str(SP) + "(m)")
 
@@ -271,7 +278,8 @@ SP=np.sqrt(np.mean(r**2))
 print("data RMS  = " + str(SP) + "(m)")
 
 r=R*(A*x-zi)
-np.savetxt(flroot+".residual_normalized.txt",r)
+if output_residual:
+    np.savetxt(flroot+".residual_normalized.txt",r, fmt="%.6e")
 SP=np.sum(r**2)
 print("misfit penalty = "+str(SP))
 
