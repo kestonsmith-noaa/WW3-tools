@@ -170,9 +170,7 @@ A = sp.coo_matrix((S, (row, col-1)), shape=(Nrows, Ncols)).tocsr() # NOTE: col i
 zi = np.array(data["z"][:]) # bathymetry observations
 ei = np.array(data["err"][:]) # bathymetry observation standard error
 
-#diag=range(len(ei))
-#R = sp.coo_matrix((1./ei, (diag, diag)), shape=(nd,nd)).tocsr()
-R = diags(ei, format="csr") # diagonal matrux of obs std err
+R = diags(1./ei, format="csr") # diagonal matrix of 1 / (obs std err) = sqrt(inv(R)) where R =obs covariance
 
 # construct smoothness penalty terms 
 # minimize misfit +  < df/dx ^2 + df/dy ^2 >
@@ -193,23 +191,42 @@ M=np.transpose(WDx)*WDx + np.transpose(WDy)*WDy # squared slope penalty,spatial 
 
 
 # scale penalty with number of observations
-Nobs=len(zi)
-Nnodes=len(x)
+#Nobs=len(zi)
+#Nnodes=len(x)
+#gamma=1.*float(Nobs)/float(Nnodes)
 
-gamma=1.*float(Nobs)/float(Nnodes)
+# Use background bathy estimate to set smoothing parameter
+z0=-z # background mesh bathymetry
+jup=np.where(z0>0.)
+z0[jup]=0.
+jbad=np.where(np.isnan(z0))
+z0[jbad]=0.
+r=R*(A*z0-zi)
+MP0=np.sum(r**2)
+print("MisfitPenalty background = "+str(MP0))
+print(M.shape)
+print(z0.shape)
+SP0=np.dot(z0,M*z0)
+print("SmoothPenalty background = "+str(SP0))
+#gamma=.05*MP0/SP0 # set smoothing parmater here 
+gamma=(10.**-8)*MP0/SP0 # set smoothing parmater here 
+print("set smoothing parameter, gamma = "+str(gamma))
 
 AR = R * A
 Rz = R * zi
-G= 2.* np.transpose(AR) * AR + 2.*gamma*M
-b =2.* np.transpose(AR)*Rz
+#G= 2.* np.transpose(AR) * AR + 2.*gamma*M
+#b =2.* np.transpose(AR)*Rz
+G=  np.transpose(AR) * AR + gamma*M
+b = np.transpose(AR)*Rz
 
 z0=-z;
 jup=np.where(z0>0.)
 z0[jup]=0.
 
+x, info = cg(G, b, x0=z0, rtol=10.**(-9))
+
 flroot=meshname+flinname
 
-x, info = cg(G, b, x0=z0, rtol=10.**(-9))
 np.savetxt(flroot+".optbat.txt",x)
 
 output_residual=False
@@ -249,21 +266,49 @@ zmaxGlobal= 1.
 zmin[jbad]=zminGlobal
 zmax[jbad]=zmaxGlobal
 
-j=np.where(np.isnan(zmean))[0].tolist()
-zmean[j]=z0[j]
+G=np.transpose(AR) * AR + gamma*M
+b=np.transpose(AR)*Rz
+
+c=-b
+from scipy.optimize import minimize, Bounds
+# 2. Define the Objective Function, Gradient, and Hessian
+# To handle large sparse matrices efficiently, provide analytical grad and hess
+def objective(x):
+    # 0.5 * x^T * Q * x + c^T * x
+    return 0.5 * x.dot(G.dot(x)) + np.dot(c, x)
+def gradient(x):
+    # Q * x + c
+    return G.dot(x) + c
+def hessian(x):
+    # Returns the sparse CSR matrix directly
+    return G
+
+lower_bounds = zmin 
+upper_bounds = zmax
+bounds = Bounds(lower_bounds, upper_bounds)
+
+# 4. Run Optimization
+# Initial guess (e.g., zeros or midpoints)
+#x0 = np.zeros(n)
+x0=z0
+res = minimize(
+    fun=objective,
+    x0=x0,
+    jac=gradient,
+    hess=hessian,
+    method='trust-constr',
+    bounds=bounds,
+    options={'maxiter': 10000, 'verbose': 1}
+)
+
+# Optimized decision variables
+print("Optimization successful:", res.success)
+#print("Optimal x:", res.x)
+print("Minimum value:", res.fun)
+
+x=res.x
 
 flroot="WithLim."+meshname+flinname
-
-#x, info = cg(G, b, x0=zmean,rtol=10.**(-9))
-x, info = cg(G, b, x0=z0,rtol=10.**(-9))
-print("CG info:")
-print(info)
-
-jhigh=np.where(x>zmax)[0].tolist()
-jlow =np.where(x<zmin)[0].tolist()
-
-x[jhigh]=zmax[jhigh]
-x[jlow]=zmin[jlow]
 
 np.savetxt(flroot+".optbat.txt",x)
 

@@ -200,11 +200,7 @@ for n in range(nn):
                                         xs.append(x[kx])
                                         ys.append(y[ky])
                                         zs.append(zd)
-                                        if LogDepthDependantObsErr :
-                                            azd=max(np.abs(zd),ZminDepthDependantObsErr)
-                                            ObsStdErr.append(fileStdErr[j]*np.log10(azd))
-                                        else :
-                                            ObsStdErr.append(fileStdErr[j])
+                                        ObsStdErr.append(fileStdErr[j])
                                         PntCnt=PntCnt+1
                 if TextOutput:
                     print("number of points from "+fl+" is " +str( PntCnt) )
@@ -227,13 +223,7 @@ for n in range(nn):
                 xs.extend(x)
                 ys.extend(y)
                 zs.extend(zd)
-                if LogDepthDependantObsErr : # observationa error increases logarithmically with obs depth
-                    azd=np.abs(zd)
-                    jshallow=np.where(azd<ZminDepthDependantObsErr)
-                    azd[jshallow]=ZminDepthDependantObsErr
-                    ObsStdErr.extend(fileStdErr[j]*np.log10(azd))
-                else :
-                    ObsStdErr.extend(zd*0. + fileStdErr[j])
+                ObsStdErr.extend(zd*0. + fileStdErr[j])
     if TextOutput:      
         if n % 1 == 0:
             print("interpolating to:"+str(yp)+":"+str(xp))

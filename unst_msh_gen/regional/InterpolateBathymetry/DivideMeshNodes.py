@@ -80,19 +80,19 @@ def WriteInterpJobscript(fl,N, ComputeNodes):
         f.write("wait \n")
         f.write("## Run this after the full job array is compleate.\n")
         f.write("## Patch randomly shuffled fields in orgigonal order.\n")
-
-        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" InvDist\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" NDataPoints\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" ClosestValue\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" LengthScale\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU.std\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN.std\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU.mu\n")
-        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN.mu\n")
-        f.write("python AddBathyToMesh.py "+mshnm+".GMU.txt 1.0 \n")
-        f.write("python AddBathyToMesh.py "+mshnm+".GMN.txt 1.0 \n")
+# move following to jobcardGMS
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" InvDist\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" NDataPoints\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" ClosestValue\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" LengthScale\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU.std\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN.std\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" GMU.mu\n")
+#        f.write("python KnitOutputBackTogether.py "+str(N)+" GMN.mu\n")
+#        f.write("python AddBathyToMesh.py "+mshnm+".GMU.txt 1.0 \n")
+#        f.write("python AddBathyToMesh.py "+mshnm+".GMN.txt 1.0 \n")
 
 
 # Create the output directory------------------------------------------

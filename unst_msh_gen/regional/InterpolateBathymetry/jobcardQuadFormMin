@@ -23,6 +23,10 @@ source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate
 
 pip list 
 
+# if point data file doesn't exist, create it here.  Files used to get data are
+# and other parameters are defined in DefineVariables.py 
+# python -u DumpObs2File.py
+
 # create parallel job card to calculate Mesh to Obs linear operator
 python -u ComputeMeshToDataInterpolationWeights.py $datafile $meshfile $N
 
@@ -30,5 +34,5 @@ sbatch --wait jobcardComputeMeshToObsInterpWeightsSLURM
 
 python -u convert_weights_to_netcdf.py $datafile $meshfile $N > convert_weights_to_netcdf.out
 
-python -u MinimizeQuadForm.py  $datafile $meshfile > MinimizeQuadForm.out
+python -u MinimizeQuadForm.py $datafile $meshfile > MinimizeQuadForm.out
 

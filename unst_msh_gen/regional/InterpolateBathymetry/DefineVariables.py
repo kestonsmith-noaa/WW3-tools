@@ -3,7 +3,6 @@ mesh="meshes/rwps.oc_500m_10km.msh"
 ########################################################
 # Begin: define data sets used in the interpolation
 BathyDir="/scratch3/NCEPDEV/climate/Keston.Smith/CoastalReliefModel/"
-BathyDir="/mnt/sda/keston/CoastalReliefModel/"
 ########################################################
 # processed netcdf bathymetry files with variables:
 # lon, lat and z. Specify corresponding file type, gridded or scattered,
@@ -74,14 +73,6 @@ fileStdErr[0]=2. # scattered point data file: cmems_obs-sdb_glo_phy-comp_my-oa-1
 fileStdErr[nf-1]=10. # global gridded bathymetry file: RTopo_2_0_4_GEBCO_v2023_60sec_pixel.CRMformat.nc
 # Set Background stdErr
 BackGroundProcStdErr=50.
-
-# Introduce log(observed depth) dependent error 
-# has problems both nin theory and practice 
-# please leave LogDepthDependantObsErr=False
-# Introduced to address some artifacts due to
-# data set structures
-LogDepthDependantObsErr=False
-ZminDepthDependantObsErr=10.
 ########################################################
 # End: define data sets used in the interpolation
 ########################################################
