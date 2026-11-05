@@ -134,6 +134,233 @@ def construct_gradient_operators_on_elements_meters(lon, lat, elements):
 
     return Dx, Dy, A
 
+def  construct_stiffness_operator_meters( lon, lat, e ) :
+
+    nn = len(lon)
+    ne = len(e)
+    deg2m=111000.
+    
+    idx = 0
+    e=e-1 # move index to 0 ... nn-1
+
+    A=np.zeros(ne, dtype=np.float64)
+    I=np.zeros(ne*9,dtype=np.int32)
+    J=np.zeros(ne*9,dtype=np.int32)
+    K=np.zeros(ne*9, dtype=np.float64) # stiffness matrix
+    M=np.zeros(ne*9, dtype=np.float64) # mass matrix
+    Mlump=np.zeros(nn, dtype=np.float64) # lumped mass (as vector)
+    
+    dx=np.zeros(3)
+    dy=np.zeros(3)
+    
+    for k in range(ne):
+        n_idx = e[k,:]
+        x1, x2, x3 = lon[n_idx]
+        y1, y2, y3 = lat[n_idx]
+        latc=(y1+y2+y3)/3.
+        # translate to (x1,y1) and convert to meters
+        x2=(x2-x1)*np.cos(latc*deg2rad)*deg2m
+        x3=(x3-x1)*np.cos(latc*deg2rad)*deg2m
+        y2=(y2-y1)*deg2m
+        y3=(y3-y1)*deg2m
+        x1=0.
+        y1=0.
+
+        dx[0]=x2-x3
+        dx[1]=x3-x1
+        dx[2]=x1-x2
+        dy[0]=y2-y3
+        dy[1]=y3-y1
+        dy[2]=y1-y2
+        
+        n0=n_idx[0]
+        n1=n_idx[1]
+        n2=n_idx[2]
+        
+        A[k]=( x[n0]*dy[0]+x[n1]*dy[1]+x[n2]*dy[2] )/2.
+        
+        for i in range(3):
+            ii=e[k,i]
+            Mlump[ii]=Mlump[ii]+A[k]/3.0
+            for j in range(3):
+                ij=e[k,j]
+                I[idx]=ii
+                J[idx]=ij
+                if ii==ij :
+                    M[idx]=A[k]/6.
+                else :
+                    M[idx]=A[k]/12.
+
+                K[idx]= ( dx[i]*dx[j]+dy[i]*dy[j] ) / A[k] /4.
+                idx+=1
+                
+    K   = csr_matrix((K, (I, J)), shape=(nn, nn))
+    Minv = diags( 1./Mlump , format="csr")
+
+    return K, M, Mlump
+
+def construct_gradient_operators_on_nodes_meters(lon, lat, e):
+
+    nn = len(lon)
+    ne = len(e)
+    deg2m=111000.
+    
+    idx = 0
+    e=e-1 # move index to 0 ... nn-1
+
+    A=np.zeros(ne, dtype=np.float64)
+    I=np.zeros(ne*9,dtype=np.int32)
+    J=np.zeros(ne*9,dtype=np.int32)
+    ddx=np.zeros(ne*9, dtype=np.float64)
+    ddy=np.zeros(ne*9, dtype=np.float64)
+    K=np.zeros(ne*9, dtype=np.float64) # stiffness matrix
+    M=np.zeros(ne*9, dtype=np.float64) # mass matrix
+    Mlump=np.zeros(nn, dtype=np.float64)
+    
+    dx=np.zeros(3)
+    dy=np.zeros(3)
+    
+    for k in range(ne):
+        n_idx = e[k,:]
+        x1, x2, x3 = lon[n_idx]
+        y1, y2, y3 = lat[n_idx]
+        latc=(y1+y2+y3)/3.
+        # translate to (x1,y1) and convert to meters
+        x2=(x2-x1)*np.cos(latc*deg2rad)*deg2m
+        x3=(x3-x1)*np.cos(latc*deg2rad)*deg2m
+        y2=(y2-y1)*deg2m
+        y3=(y3-y1)*deg2m
+        x1=0.
+        y1=0.
+
+        dx[0]=x2-x3
+        dx[1]=x3-x1
+        dx[2]=x1-x2
+        dy[0]=y2-y3
+        dy[1]=y3-y1
+        dy[2]=y1-y2
+        
+        n0=n_idx[0]
+        n1=n_idx[1]
+        n2=n_idx[2]
+        
+        A[k]=( x[n0]*dy[0]+x[n1]*dy[1]+x[n2]*dy[2] )/2.
+        
+        for i in range(3):
+            ii=e[k,i]
+            Mlump[ii]=Mlump[ii]+A[k]/3.0
+            for j in range(3):
+                ij=e[k,j]
+                ddx[idx]=ddx[idx]+dy[j]/6.
+                ddy[idx]=ddy[idx]+dx[j]/6.
+                I[idx]=ii
+                J[idx]=ij
+                if ii==ij :
+                    M[idx]=A[k]/6.
+                else :
+                    M[idx]=A[k]/12.
+
+                K[idx]= ( dx[i]*dx[j]+dy[i]*dy[j] ) / A[k] /4.
+                idx+=1
+                
+    DDx = csr_matrix((ddx, (I, J)), shape=(nn, nn))
+    DDy = csr_matrix((ddy, (I, J)), shape=(nn, nn))
+    K   = csr_matrix((K, (I, J)), shape=(nn, nn))
+    M   = csr_matrix((M, (I, J)), shape=(nn, nn))
+    Minv = diags( 1./Mlump , format="csr")
+    Mlump = diags( Mlump , format="csr")
+
+    return DDx, DDy, M, K, Mlump, Minv
+
+def get_boundary_nodes( elements):
+  """Determine boundary nodes of a 2D triangular mesh.
+
+    Parameters:
+        nodes: (N, 2) array of (x, y) coordinates for N nodes.
+        elements: (M, 3) array of node indices for M triangular elements.
+
+    Returns:
+        boundary_nodes: 1D numpy array of unique boundary node indices.
+    """
+  edge_count = {}
+
+  # Each triangle has 3 edges (pairs of node indices)
+  for tri in elements:
+    # Ensure consistent edge orientation (sorted tuple) so (i, j) == (j, i)
+    edges = [
+        tuple(sorted((tri[0], tri[1]))),
+        tuple(sorted((tri[1], tri[2]))),
+        tuple(sorted((tri[2], tri[0]))),
+    ]
+
+    for edge in edges:
+      edge_count[edge] = edge_count.get(edge, 0) + 1
+
+  # Boundary edges appear exactly once
+  boundary_nodes = set()
+  for edge, count in edge_count.items():
+    if count == 1:
+      boundary_nodes.add(edge[0])
+      boundary_nodes.add(edge[1])
+
+  return np.array(sorted(list(boundary_nodes)))
+
+import numpy as np
+from scipy.sparse import csr_matrix
+
+
+def set_rows_to_identity_elements(A, J):
+  """Zeros out rows in array J, setting A[j, j] = 1 for each j in J."""
+  A = A.tocsr()
+  A.sort_indices()
+
+  # Ensure J is a unique NumPy array of integers
+  J = np.unique(np.atleast_1d(J).astype(int))
+
+  # 1. Identify slices in A.data corresponding to the rows in J
+  # Generate ranges of indices to wipe out
+  starts = A.indptr[J]
+  ends = A.indptr[J + 1]
+
+  # Vectorized creation of all data/index positions inside target rows
+  # equivalent to: np.concatenate([np.arange(s, e) for s, e in zip(starts, ends)])
+  counts = ends - starts
+  if counts.sum() == 0:
+    return A  # No elements to modify in these rows
+
+  # Create flat array of all data coordinates belonging to rows in J
+  repeat_offsets = np.repeat(starts, counts)
+  sequence_offsets = np.arange(counts.sum()) - np.repeat(
+      np.cumsum(counts) - counts, counts
+  )
+  data_indices = repeat_offsets + sequence_offsets
+
+  # 2. Zero out all existing entries in those rows
+  A.data[data_indices] = 0.0
+
+  # 3. Handle setting the diagonal element A[j, j] = 1
+  # Find where column index matches row index within the sliced blocks
+  col_indices = A.indices[data_indices]
+  row_indices_mapped = np.repeat(J, counts)
+
+  diag_mask = col_indices == row_indices_mapped
+  actual_diag_data_positions = data_indices[diag_mask]
+
+  if len(actual_diag_data_positions) == len(J):
+    # Perfect scenario: All A[j,j] slots already existed structurally
+    A.data[actual_diag_data_positions] = 1.0
+  else:
+    # Safe fallback if some diagonal items structurally didn't exist yet:
+    # Convert to LIL or reconstruct cleanly
+    A_lil = A.tolil()
+    A_lil[J, :] = 0
+    A_lil[J, J] = 1
+    A = A_lil.tocsr()
+
+  A.eliminate_zeros()
+  return A
+
+
 #main program
 import sys
 import numpy as np
@@ -143,6 +370,10 @@ import scipy.sparse as sp
 
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import cg
+
+
+ApplyLandValues=True
+z_coast=-2.0
 
 nargin = len(sys.argv) - 1
 flin=sys.argv[1]
@@ -172,28 +403,33 @@ ei = np.array(data["err"][:]) # bathymetry observation standard error
 
 R = diags(1./ei, format="csr") # diagonal matrix of 1 / (obs std err) = sqrt(inv(R)) where R =obs covariance
 
+UseTPS=True
+UseTVD=False
 # construct smoothness penalty terms 
+# TPS smoothness penalty < (d2f/dx2 )^2 +2*(d2f/dxdy )^2 (d2f/dy2 )^2 +  >
+# where d2f/dx2 is the second derivative of f in the x direction, etc. 
+if UseTPS :
+#    DDx, DDy, M, K, Mlump, Minv = construct_gradient_operators_on_nodes_meters( x, y, e )
+    K, Mass, Mlump = construct_stiffness_operator_meters( x, y, e )
+    Minv = diags(1./Mlump, format="csr")
+    M  = K * Minv * K
+    Msqrt=diags(np.sqrt(1./Mlump), format="csr")*K # M= Msqrt^T * Msqrt
+
+# TVD smoothness penalty
 # minimize misfit +  < df/dx ^2 + df/dy ^2 >
 # Dx,Dy, EleArea=construct_gradient_operators_on_elements(x, y, e) # gradient operators 
-Dx,Dy, EleArea=construct_gradient_operators_on_elements_meters(x, y, e) # gradient operators 
-print("EleArea")
-print(np.min(EleArea))
-e0=e-1
-EleArea0=FE.ElementArea(x, y, e0)
+if UseTVD :
+    Dx, Dy, EleArea=construct_gradient_operators_on_elements_meters(x, y, e) # gradient operators 
+    print("EleArea")
+    print(np.min(EleArea))
+    W = diags(np.sqrt(EleArea), format="csr") # square root of element area
+    WDx=W*Dx
+    WDy=W*Dy
+    M=np.transpose(WDx)*WDx + np.transpose(WDy)*WDy # squared slope penalty,spatial integral
+    Msqrt=WDx+WDy
 
-W = diags(np.sqrt(EleArea), format="csr") # square root of element area
-#W = diags(np.sqrt(EleArea0), format="csr") # square root of element area
-
-WDx=W*Dx
-WDy=W*Dy
-
-M=np.transpose(WDx)*WDx + np.transpose(WDy)*WDy # squared slope penalty,spatial integral
-
-
-# scale penalty with number of observations
-#Nobs=len(zi)
-#Nnodes=len(x)
-#gamma=1.*float(Nobs)/float(Nnodes)
+print("M")
+print(M)
 
 # Use background bathy estimate to set smoothing parameter
 z0=-z # background mesh bathymetry
@@ -209,21 +445,39 @@ print(z0.shape)
 SP0=np.dot(z0,M*z0)
 print("SmoothPenalty background = "+str(SP0))
 #gamma=.05*MP0/SP0 # set smoothing parmater here 
-gamma=(10.**-8)*MP0/SP0 # set smoothing parmater here 
+gamma=(10.**-4)*MP0/SP0 # set smoothing parmater here 
 print("set smoothing parameter, gamma = "+str(gamma))
+
+
+jl=np.where(zi > z_coast)
+zi[jl]=z_coast
 
 AR = R * A
 Rz = R * zi
-#G= 2.* np.transpose(AR) * AR + 2.*gamma*M
-#b =2.* np.transpose(AR)*Rz
+
 G=  np.transpose(AR) * AR + gamma*M
 b = np.transpose(AR)*Rz
+
+if ApplyLandValues :
+    # simple determine land boundaries
+    bnd=get_boundary_nodes( e )
+    bnd=bnd-1 # indexed 1...nn -> 0 ...(nn-1)
+    r=.1
+    jE=np.where( x[bnd] > np.min(x)+r )[0].tolist()
+    jW=np.where( x[bnd] < np.max(x)-r )[0].tolist()
+    jN=np.where( y[bnd] > np.min(y)+r )[0].tolist()
+    jS=np.where( y[bnd] < np.max(y)-r )[0].tolist()
+    jint=list( set(jE) & set(jW) & set(jN) & set(jS) )
+    bnd=bnd[jint]
+    G=set_rows_to_identity_elements(G, bnd)
+    b[bnd]=z_coast
 
 z0=-z;
 jup=np.where(z0>0.)
 z0[jup]=0.
 
-x, info = cg(G, b, x0=z0, rtol=10.**(-9))
+
+x, info = cg(G, b, x0=z0, rtol=10.**(-8))
 
 flroot=meshname+flinname
 
@@ -246,90 +500,98 @@ if output_residual:
 SP=np.sum(r**2)
 print("misfit penalty = "+str(SP))
 
-r=WDx*x
+if UseTVD:
+    rx=WDx*x
+    ry=WDy*x
+    SP=gamma*np.sum(rx**2+ry**2)
+    r=np.sqrt(rx**2+ry**2) # I think this is right
+else:
+    r=Msqrt*x
+
 np.savetxt(flroot+".smoothness_penalty.txt",r)
 SP=gamma*np.sum(r**2)
 print("smoothness penalty = "+str(SP))
 
 ################################################################
 #Apply local limits to solution:
+ComputeLocalLimitSolution = False
+if ComputeLocalLimitSolution :
+    flinZlim="MeshNodeInfo."+meshname+flinname+".nc"
+    data = nc.Dataset(flinZlim,"r")
+    zmean=np.array(data["zmean"][:])
+    zmin=np.array(data["zmin"][:])
+    zmax=np.array(data["zmax"][:])
 
-flinZlim="MeshNodeInfo."+meshname+flinname+".nc"
-data = nc.Dataset(flinZlim,"r")
-zmean=np.array(data["zmean"][:])
-zmin=np.array(data["zmin"][:])
-zmax=np.array(data["zmax"][:])
+    jbad=np.where(zmin>zmax)[0].tolist()
+    zminGlobal=-11000.
+    zmaxGlobal= 1.
+    zmin[jbad]=zminGlobal
+    zmax[jbad]=zmaxGlobal
 
-jbad=np.where(zmin>zmax)[0].tolist()
-zminGlobal=-11000.
-zmaxGlobal= 1.
-zmin[jbad]=zminGlobal
-zmax[jbad]=zmaxGlobal
+    G=np.transpose(AR) * AR + gamma*M
+    b=np.transpose(AR)*Rz
 
-G=np.transpose(AR) * AR + gamma*M
-b=np.transpose(AR)*Rz
+    c=-b
+    from scipy.optimize import minimize, Bounds
+    # 2. Define the Objective Function, Gradient, and Hessian
+    # To handle large sparse matrices efficiently, provide analytical grad and hess
+    def objective(x):
+        # 0.5 * x^T * Q * x + c^T * x
+        return 0.5 * x.dot(G.dot(x)) + np.dot(c, x)
+    def gradient(x):
+        # Q * x + c
+        return G.dot(x) + c
+    def hessian(x):
+        # Returns the sparse CSR matrix directly
+        return G
 
-c=-b
-from scipy.optimize import minimize, Bounds
-# 2. Define the Objective Function, Gradient, and Hessian
-# To handle large sparse matrices efficiently, provide analytical grad and hess
-def objective(x):
-    # 0.5 * x^T * Q * x + c^T * x
-    return 0.5 * x.dot(G.dot(x)) + np.dot(c, x)
-def gradient(x):
-    # Q * x + c
-    return G.dot(x) + c
-def hessian(x):
-    # Returns the sparse CSR matrix directly
-    return G
+    lower_bounds = zmin 
+    upper_bounds = zmax
+    bounds = Bounds(lower_bounds, upper_bounds)
 
-lower_bounds = zmin 
-upper_bounds = zmax
-bounds = Bounds(lower_bounds, upper_bounds)
+    # 4. Run Optimization
+    # Initial guess (e.g., zeros or midpoints)
+    #x0 = np.zeros(n)
+    x0=z0
+    res = minimize(
+        fun=objective,
+        x0=x0,
+        jac=gradient,
+        hess=hessian,
+        method='trust-constr',
+        bounds=bounds,
+        options={'maxiter': 10000, 'verbose': 1}
+    )
 
-# 4. Run Optimization
-# Initial guess (e.g., zeros or midpoints)
-#x0 = np.zeros(n)
-x0=z0
-res = minimize(
-    fun=objective,
-    x0=x0,
-    jac=gradient,
-    hess=hessian,
-    method='trust-constr',
-    bounds=bounds,
-    options={'maxiter': 10000, 'verbose': 1}
-)
+    # Optimized decision variables
+    print("Optimization successful:", res.success)
+    #print("Optimal x:", res.x)
+    print("Minimum value:", res.fun)
 
-# Optimized decision variables
-print("Optimization successful:", res.success)
-#print("Optimal x:", res.x)
-print("Minimum value:", res.fun)
+    x=res.x
 
-x=res.x
+    flroot="WithLim."+meshname+flinname
 
-flroot="WithLim."+meshname+flinname
+    np.savetxt(flroot+".optbat.txt",x)
 
-np.savetxt(flroot+".optbat.txt",x)
+    r=A*x-zi
+    if output_residual:
+        np.savetxt(flroot+".residual.txt",r, fmt="%.6e")
+    SP=np.sqrt(np.mean(r**2))
+    print("Misfit RMS = "+str(SP) + "(m)")
 
-r=A*x-zi
-if output_residual:
-    np.savetxt(flroot+".residual.txt",r, fmt="%.6e")
-SP=np.sqrt(np.mean(r**2))
-print("Misfit RMS = "+str(SP) + "(m)")
+    r=zi-np.mean(zi)
+    SP=np.sqrt(np.mean(r**2))
+    print("data RMS  = " + str(SP) + "(m)")
 
-r=zi-np.mean(zi)
-SP=np.sqrt(np.mean(r**2))
-print("data RMS  = " + str(SP) + "(m)")
+    r=R*(A*x-zi)
+    if output_residual:
+        np.savetxt(flroot+".residual_normalized.txt",r, fmt="%.6e")
+    SP=np.sum(r**2)
+    print("misfit penalty = "+str(SP))
 
-r=R*(A*x-zi)
-if output_residual:
-    np.savetxt(flroot+".residual_normalized.txt",r, fmt="%.6e")
-SP=np.sum(r**2)
-print("misfit penalty = "+str(SP))
-
-r=WDx*x
-np.savetxt(flroot+".smoothness_penalty.txt",r)
-SP=gamma*np.sum(r**2)
-print("smoothness penalty = "+str(SP))
+    r=WDx*x
+    np.savetxt(flroot+".smoothness_penalty.txt",r)
+    SP=gamma*np.sum(r**2)
+    print("smoothness penalty = "+str(SP))
 
