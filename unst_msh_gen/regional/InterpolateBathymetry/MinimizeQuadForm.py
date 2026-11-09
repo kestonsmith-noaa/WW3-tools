@@ -4,6 +4,19 @@ import os
 import FiniteElementMeshRoutines as FE
 from scipy.sparse import diags
 
+ComputeLocalLimitSolution = True
+ApplyLandValues=True
+ImposeLimitsToObs=True
+z_coast=-2.0
+zminGlobal=-11000.
+zmaxGlobal= 1.
+zmaxGlobal= z_coast
+Smooth="TPS"
+gamma0=10.**(-4)
+#Smooth="TVD"
+#gamma0=10.**(-2)
+
+
 deg2rad= np.pi / 180.
 deg2kmY=111.
 
@@ -371,10 +384,6 @@ import scipy.sparse as sp
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import cg
 
-
-ApplyLandValues=True
-z_coast=-2.0
-
 nargin = len(sys.argv) - 1
 flin=sys.argv[1]
 mshfl=sys.argv[2]
@@ -401,32 +410,37 @@ A = sp.coo_matrix((S, (row, col-1)), shape=(Nrows, Ncols)).tocsr() # NOTE: col i
 zi = np.array(data["z"][:]) # bathymetry observations
 ei = np.array(data["err"][:]) # bathymetry observation standard error
 
+if ImposeLimitsToObs:
+    jh=np.where(zi>zmaxGlobal)
+    jl=np.where(zi<zminGlobal)
+    zi[jh]=zmaxGlobal
+    zi[jl]=zminGlobal
+
 R = diags(1./ei, format="csr") # diagonal matrix of 1 / (obs std err) = sqrt(inv(R)) where R =obs covariance
 
-UseTPS=True
-UseTVD=False
 # construct smoothness penalty terms 
 # TPS smoothness penalty < (d2f/dx2 )^2 +2*(d2f/dxdy )^2 (d2f/dy2 )^2 +  >
 # where d2f/dx2 is the second derivative of f in the x direction, etc. 
-if UseTPS :
+match Smooth:
+    case "TPS":
 #    DDx, DDy, M, K, Mlump, Minv = construct_gradient_operators_on_nodes_meters( x, y, e )
-    K, Mass, Mlump = construct_stiffness_operator_meters( x, y, e )
-    Minv = diags(1./Mlump, format="csr")
-    M  = K * Minv * K
-    Msqrt=diags(np.sqrt(1./Mlump), format="csr")*K # M= Msqrt^T * Msqrt
-
-# TVD smoothness penalty
-# minimize misfit +  < df/dx ^2 + df/dy ^2 >
-# Dx,Dy, EleArea=construct_gradient_operators_on_elements(x, y, e) # gradient operators 
-if UseTVD :
-    Dx, Dy, EleArea=construct_gradient_operators_on_elements_meters(x, y, e) # gradient operators 
-    print("EleArea")
-    print(np.min(EleArea))
-    W = diags(np.sqrt(EleArea), format="csr") # square root of element area
-    WDx=W*Dx
-    WDy=W*Dy
-    M=np.transpose(WDx)*WDx + np.transpose(WDy)*WDy # squared slope penalty,spatial integral
-    Msqrt=WDx+WDy
+        K, Mass, Mlump = construct_stiffness_operator_meters( x, y, e )
+        Minv = diags(1./Mlump, format="csr")
+        M  = K * Minv * K
+        Msqrt=diags(np.sqrt(1./Mlump), format="csr")*K # M= Msqrt^T * Msqrt
+        Dx, Dy, EleArea=construct_gradient_operators_on_elements_meters(x, y, e) # gradient operators 
+        W = diags(np.sqrt(EleArea), format="csr") # square root of element area
+        WDx=W*Dx
+        WDy=W*Dy
+    case "TVD":
+        Dx, Dy, EleArea=construct_gradient_operators_on_elements_meters(x, y, e) # gradient operators 
+        print("EleArea")
+        print(np.min(EleArea))
+        W = diags(np.sqrt(EleArea), format="csr") # square root of element area
+        WDx=W*Dx
+        WDy=W*Dy
+        M=np.transpose(WDx)*WDx + np.transpose(WDy)*WDy # squared slope penalty,spatial integral
+        Msqrt=WDx+WDy
 
 print("M")
 print(M)
@@ -445,7 +459,8 @@ print(z0.shape)
 SP0=np.dot(z0,M*z0)
 print("SmoothPenalty background = "+str(SP0))
 #gamma=.05*MP0/SP0 # set smoothing parmater here 
-gamma=(10.**-4)*MP0/SP0 # set smoothing parmater here 
+#gamma=(10.**-4)*MP0/SP0 # set smoothing parmater here 
+gamma=gamma0*MP0/SP0 # set smoothing parmater here 
 print("set smoothing parameter, gamma = "+str(gamma))
 
 
@@ -458,9 +473,12 @@ Rz = R * zi
 G=  np.transpose(AR) * AR + gamma*M
 b = np.transpose(AR)*Rz
 
+
 if ApplyLandValues :
     # simple determine land boundaries
     bnd=get_boundary_nodes( e )
+    print("bnd")
+    print(bnd)
     bnd=bnd-1 # indexed 1...nn -> 0 ...(nn-1)
     r=.1
     jE=np.where( x[bnd] > np.min(x)+r )[0].tolist()
@@ -476,8 +494,13 @@ z0=-z;
 jup=np.where(z0>0.)
 z0[jup]=0.
 
-
 x, info = cg(G, b, x0=z0, rtol=10.**(-8))
+print(info)
+print("info")
+
+import osqp
+from scipy import sparse
+from scipy.sparse import csr_array, csc_array
 
 flroot=meshname+flinname
 
@@ -500,13 +523,14 @@ if output_residual:
 SP=np.sum(r**2)
 print("misfit penalty = "+str(SP))
 
-if UseTVD:
-    rx=WDx*x
-    ry=WDy*x
-    SP=gamma*np.sum(rx**2+ry**2)
-    r=np.sqrt(rx**2+ry**2) # I think this is right
-else:
-    r=Msqrt*x
+match Smooth:
+    case "TVD":
+        rx=WDx*x
+        ry=WDy*x
+        SP=gamma*np.sum(rx**2+ry**2)
+        r=np.sqrt(rx**2+ry**2) # I think this is right
+    case "TPS":
+        r=Msqrt*x
 
 np.savetxt(flroot+".smoothness_penalty.txt",r)
 SP=gamma*np.sum(r**2)
@@ -514,7 +538,7 @@ print("smoothness penalty = "+str(SP))
 
 ################################################################
 #Apply local limits to solution:
-ComputeLocalLimitSolution = False
+ComputeLocalLimitSolution = True
 if ComputeLocalLimitSolution :
     flinZlim="MeshNodeInfo."+meshname+flinname+".nc"
     data = nc.Dataset(flinZlim,"r")
@@ -523,57 +547,62 @@ if ComputeLocalLimitSolution :
     zmax=np.array(data["zmax"][:])
 
     jbad=np.where(zmin>zmax)[0].tolist()
-    zminGlobal=-11000.
-    zmaxGlobal= 1.
     zmin[jbad]=zminGlobal
     zmax[jbad]=zmaxGlobal
 
     G=np.transpose(AR) * AR + gamma*M
     b=np.transpose(AR)*Rz
 
-    c=-b
-    from scipy.optimize import minimize, Bounds
-    # 2. Define the Objective Function, Gradient, and Hessian
-    # To handle large sparse matrices efficiently, provide analytical grad and hess
-    def objective(x):
-        # 0.5 * x^T * Q * x + c^T * x
-        return 0.5 * x.dot(G.dot(x)) + np.dot(c, x)
-    def gradient(x):
-        # Q * x + c
-        return G.dot(x) + c
-    def hessian(x):
-        # Returns the sparse CSR matrix directly
-        return G
+    print("a")
+    from scipy.optimize import lsq_linear
+    if ApplyLandValues :
+        # simple determine land boundaries
+        bnd=get_boundary_nodes( e )
+        bnd=bnd-1 # indexed 1...nn -> 0 ...(nn-1)
+        print("bnd")
+        print(bnd)
+        print(len(bnd))
+        r=.1 # assume oriented rectangular boundary
+        jE=np.where( x[bnd] > np.min(x)+r )[0].tolist()
+        jW=np.where( x[bnd] < np.max(x)-r )[0].tolist()
+        jN=np.where( y[bnd] > np.min(y)+r )[0].tolist()
+        jS=np.where( y[bnd] < np.max(y)-r )[0].tolist()
+        jint=list( set(jE) & set(jW) & set(jN) & set(jS) )
+        bnd=bnd[jint]
+        print(bnd)
+        print(len(bnd))
+        G=set_rows_to_identity_elements(G, bnd)
+        b[bnd]=z_coast
+        zmax[bnd]=z_coast+1.
+        zmin[bnd]=z_coast-1.
+        # this may not be correct- need to remove land points from the
+        # matrix and account on RHS 
 
-    lower_bounds = zmin 
-    upper_bounds = zmax
-    bounds = Bounds(lower_bounds, upper_bounds)
 
     # 4. Run Optimization
     # Initial guess (e.g., zeros or midpoints)
     #x0 = np.zeros(n)
     x0=z0
-    res = minimize(
-        fun=objective,
-        x0=x0,
-        jac=gradient,
-        hess=hessian,
-        method='trust-constr',
-        bounds=bounds,
-        options={'maxiter': 10000, 'verbose': 1}
-    )
-
-    # Optimized decision variables
-    print("Optimization successful:", res.success)
-    #print("Optimal x:", res.x)
-    print("Minimum value:", res.fun)
-
+    import osqp
+    from scipy import sparse
+    from scipy.sparse import csr_array, csc_array
+    prob = osqp.OSQP()
+    Aeye = diags(np.ones(nn), format="csr")
+# wrong!!!    prob.setup(G.tocsc(), b, Aeye.tocsc(), zmin, zmax, alpha=1.0, eps_abs=1e-7, eps_rel=1e-7 )
+    prob.setup(G.tocsc(), -b, Aeye.tocsc(), zmin, zmax, alpha=1.0, eps_abs=1e-7, eps_rel=1e-7 )
+    
+    #x_cg, info = cg(G, b, x0=z0, rtol=10.**(-8))
+    #prob.warm_start(x=x_cg) #converge more slowly to same solution
+    #prob.warm_start(x=z0) 
+    
+    res = prob.solve()
     x=res.x
 
     flroot="WithLim."+meshname+flinname
 
     np.savetxt(flroot+".optbat.txt",x)
 
+    output_residual=False
     r=A*x-zi
     if output_residual:
         np.savetxt(flroot+".residual.txt",r, fmt="%.6e")
@@ -590,8 +619,17 @@ if ComputeLocalLimitSolution :
     SP=np.sum(r**2)
     print("misfit penalty = "+str(SP))
 
-    r=WDx*x
+    match Smooth:
+        case "TVD":
+            rx=WDx*x
+            ry=WDy*x
+            SP=gamma*np.sum(rx**2+ry**2)
+            r=np.sqrt(rx**2+ry**2) # I think this is right
+        case "TPS":
+            r=Msqrt*x
+
     np.savetxt(flroot+".smoothness_penalty.txt",r)
     SP=gamma*np.sum(r**2)
     print("smoothness penalty = "+str(SP))
+
 

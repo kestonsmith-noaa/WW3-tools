@@ -20,8 +20,8 @@ meshfile=meshes/rwps.oc_500m_10km.msh
 module purge 
 
 source /scratch3/NCEPDEV/climate/Keston.Smith/esmpyenv2/esmpyenv/bin/activate 
-
 pip list 
+
 # create parallel job card to calculate Mesh to Obs linear operator
 python -u ComputeMeshToDataInterpolationWeights.py $datafile $meshfile $N
 
@@ -29,5 +29,8 @@ sbatch --wait jobcardComputeMeshToObsInterpWeightsSLURM
 
 python -u convert_weights_to_netcdf.py $datafile $meshfile $N > convert_weights_to_netcdf.out
 
-python -u MinimizeQuadForm.py  $datafile $meshfile > MinimizeQuadForm.out
+python3 -m pip install osqp
+pip list 
+
+python3 -u MinimizeQuadForm.py  $datafile $meshfile > MinimizeQuadForm.out
 
