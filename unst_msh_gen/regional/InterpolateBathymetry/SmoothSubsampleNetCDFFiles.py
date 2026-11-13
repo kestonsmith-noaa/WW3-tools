@@ -21,6 +21,7 @@ from scipy import signal
 #[0->7] variables(dimensions): |S1 crs(), float64 lat(lat), float64 lon(lon), float32 z(lat, lon)
 #[8->9]variables(dimensions): float64 x(x), float64 y(y), float32 z(y, x)
 #[10]variables(dimensions): float64 lon(num_lon), float64 lat(num_lat), int16 bed_elevation(num_row, num_col)
+dirrt="/scratch3/NCEPDEV/climate/Keston.Smith/CoastalReliefModel/"
 
 flnms=[
     "crm_vol1_2023.nc",#dx= 0.00027, 3600/deg
@@ -54,7 +55,9 @@ for fl in flnms:
     if (fl == "pibhmc_bathy_60m_guam.crm.nc" or "ngdc_bathy_90m_amsamoa.crm.nc"):
         Nsubsample=3
         Nstart=1
-        
+
+    fl=dirrt+fl 
+
     data0 = nc.Dataset(fl,"r")
     x=np.asarray(data0["lon"][:])
     y=np.asarray(data0["lat"][:])
@@ -63,6 +66,12 @@ for fl in flnms:
         z=z.astype(np.float32)
     else:
         z=np.asarray(data0["z"][:])
+
+    # some missed mask found in hurl_bathy_60m_nwhi
+    Zmin=-11000.
+    j=np.where(z<Zmin)
+    z[j]=float('nan');
+
     nx=len(x)
     ny=len(y)
     dx=x[1]-x[0]
@@ -86,7 +95,8 @@ for fl in flnms:
     nx=len(x)
     ny=len(y)
 #    flout=fl+'.S250m.nc'
-    flout=fl+'.S250m.VB.nc'
+#    flout=fl+'.S250m.VB.nc'
+    flout=fl+'.S250m.verC.nc'
         # This file has an un recognized fill value
 #    if fl == "crm_vol10_2023.nc": 
     if ( (fl == "crm_vol10_2023.nc") or (fl == "crm_socal_1as_vers2.nc") ) : # This file has an un recognized fill value

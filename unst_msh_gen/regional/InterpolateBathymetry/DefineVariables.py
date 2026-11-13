@@ -9,7 +9,7 @@ BathyDir="/scratch3/NCEPDEV/climate/Keston.Smith/CoastalReliefModel/"
 # in list "filetype" below.
 ########################################################
 flnms=[
-    "cmems_obs-sdb_glo_phy-comp_my-oa-100m-l4-s2_static.PointValues500m.nc",
+    "cmems_obs-sdb_glo_phy-comp_my-oa-100m-l4-s2_static.PointValues200m.nc",
     "crm_vol1_2023.nc.S250m.VB.nc",
     "crm_vol2_2023.nc.S250m.VB.nc",
     "crm_vol3_2023.nc.S250m.VB.nc",
@@ -22,8 +22,9 @@ flnms=[
     "crm_vol8_2023.nc.S250m.VB.nc",
     "crm_southak.CRMformat.nc",
     "hurl_bathy_60m_nwhi.CRMformat.nc.S250m.VB.nc",
-    "PIX/ngdc_bathy_180m_mariana.CRM.nc",
     "ngdc_bathy_90m_amsamoa.crm.nc",
+    "PIX/ngdc_bathy_180m_mariana.CRM.no_guam.nc",
+    "PIX/pibhmc_bathy_60m_guam.CRM.S200m.nc",
     "PIX/pibhmc_bathy_10m_agrihan.CRM.S200m.nc",
     "PIX/pibhmc_bathy_10m_alamagan.CRM.S200m.nc",
     "PIX/pibhmc_bathy_10m_asuncion.CRM.S200m.nc",

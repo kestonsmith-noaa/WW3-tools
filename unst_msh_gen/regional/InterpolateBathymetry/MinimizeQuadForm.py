@@ -4,6 +4,11 @@ import os
 import FiniteElementMeshRoutines as FE
 from scipy.sparse import diags
 
+
+
+WidenLocalConstraint=False
+Nrelax=1
+
 ComputeLocalLimitSolution = True
 ApplyLandValues=True
 ImposeLimitsToObs=True
@@ -11,10 +16,10 @@ z_coast=-2.0
 zminGlobal=-11000.
 zmaxGlobal= 1.
 zmaxGlobal= z_coast
-Smooth="TPS"
-gamma0=10.**(-4)
-#Smooth="TVD"
-#gamma0=10.**(-2)
+#Smooth="TPS"
+#gamma0=10.**(-4)
+Smooth="TVD"
+gamma0=10.**(-2)
 
 
 deg2rad= np.pi / 180.
@@ -550,6 +555,40 @@ if ComputeLocalLimitSolution :
     zmin[jbad]=zminGlobal
     zmax[jbad]=zmaxGlobal
 
+
+
+    if WidenLocalConstraint:
+        zl=np.vstack((zmin,zmax))
+        np.savetxt('zlimits0.txt',zl.T)
+        ne=len(e)
+        print("ne = " + str(ne))
+        for jit in range(Nrelax):
+            zminE=np.zeros(ne)+zmaxGlobal
+            zmaxE=np.zeros(ne)+zminGlobal
+            for k in range(ne):
+                indx=e[k,:]-1
+                zmaxE[k]=np.max(zmax[indx])
+                zminE[k]=np.min(zmin[indx])
+            zmin0=zmin
+            zmax0=zmax
+            for k in range(ne):
+                indx=e[k,:]-1
+                for ii in range(3):
+                    zmin0[indx[ii]]=min(zmin0[indx[ii]],zminE[k])
+                    zmax0[indx[ii]]=max(zmax0[indx[ii]],zmaxE[k])
+            zmin=zmin0
+            zmax=zmax0
+        
+        zl=np.vstack((zmin,zmax))
+        zlE=np.vstack((zminE,zmaxE))
+        np.savetxt('zlimits.txt',zl.T)
+        np.savetxt('zlimitsE.txt',zlE.T)
+
+
+
+
+
+
     G=np.transpose(AR) * AR + gamma*M
     b=np.transpose(AR)*Rz
 
@@ -589,7 +628,8 @@ if ComputeLocalLimitSolution :
     prob = osqp.OSQP()
     Aeye = diags(np.ones(nn), format="csr")
 # wrong!!!    prob.setup(G.tocsc(), b, Aeye.tocsc(), zmin, zmax, alpha=1.0, eps_abs=1e-7, eps_rel=1e-7 )
-    prob.setup(G.tocsc(), -b, Aeye.tocsc(), zmin, zmax, alpha=1.0, eps_abs=1e-7, eps_rel=1e-7 )
+#    prob.setup(G.tocsc(), -b, Aeye.tocsc(), zmin, zmax, alpha=1.0, eps_abs=1e-7, eps_rel=1e-7 )
+    prob.setup(G.tocsc(), -b, Aeye.tocsc(), zmin, zmax, alpha=1.0, eps_abs=1e-7, eps_rel=1e-7 , max_iter=10000)
     
     #x_cg, info = cg(G, b, x0=z0, rtol=10.**(-8))
     #prob.warm_start(x=x_cg) #converge more slowly to same solution

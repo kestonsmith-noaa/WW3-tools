@@ -14,7 +14,10 @@
 #meshfile=meshes/rwps.oc_1500m_30km.msh
 
 N=384
-datafile=AllMarineDataPoints.nc
+#datafile=AllMarineDataPoints.nc
+#datafile=AllMarineDataPointsNew.nc
+#datafile=AllMarineDataPointsCMEMS200m.nc
+datafile=AllMarineDataPointsCMEMS200_guam_fixed.nc
 meshfile=meshes/rwps.oc_500m_10km.msh
 
 module purge 

@@ -7,6 +7,7 @@ from scipy.signal import convolve2d
 PacificIslandBatPath="/scratch3/NCEPDEV/climate/Keston.Smith/CoastalReliefModel/PIX"
 
 flnms=[
+    "pibhmc_bathy_60m_guam.CRM.nc",
     "pibhmc_bathy_10m_agrihan.CRM.nc",
     "pibhmc_bathy_10m_alamagan.CRM.nc",
     "pibhmc_bathy_10m_asuncion.CRM.nc",
@@ -37,6 +38,7 @@ flnms=[
 #    "ngdc_bathy_180m_mariana.CRM.nc"
 
 filval=-99999
+zmin=-11000.
 target_dx=.200 # taget resolution km
 for fl in flnms:
     flin=PacificIslandBatPath+"/"+fl
@@ -64,6 +66,8 @@ for fl in flnms:
     filval0=data0["z"]._FillValue
     z=np.asarray(data0["z"][:])
     jfill=np.where(z==filval0)
+    z[jfill]=float('nan')
+    jfill=np.where(z<zmin)
     z[jfill]=float('nan')
     
     nx=len(x)

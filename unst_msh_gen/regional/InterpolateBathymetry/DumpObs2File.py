@@ -95,7 +95,7 @@ if TextOutput :
     np.savetxt("AllBathyZ.txt" , zs, fmt="%.8e" )
     np.savetxt("AllBathyStd.txt" , es, fmt="%.8e" )
 else :    
-   with nc.Dataset("AllMarineDataPoints.nc", 'w', format='NETCDF4') as ncout:
+   with nc.Dataset("AllMarineDataPointsCMEMS200_guam_fixed.nc", 'w', format='NETCDF4') as ncout:
         n=len(zs)
         ncout.createDimension('N', n)  # Unlimited dimension
         
